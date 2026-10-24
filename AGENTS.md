@@ -157,6 +157,8 @@ LIFTLOG-CHANGES
 
 ## Testing changes
 
+- Everything is in one script scope, so a new `function foo()` silently replaces an existing one with the same name. Before committing, check for duplicates: `grep -oE "function [A-Za-z_$][A-Za-z0-9_$]*\(" index.html | sort | uniq -d` should print nothing.
+
 - Serve the folder over HTTP locally (for example `python3 -m http.server 8000`) and open `http://localhost:8000/`. Service workers work on `localhost` without HTTPS.
 - Use a private window or clear site data to test first launch; DevTools → Application shows `localStorage`, the service worker and the caches.
 - To test the update toast: load the page, bump `VERSION` in `sw.js`, then reload. The toast appears once the new worker has installed.

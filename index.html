@@ -351,7 +351,7 @@ function onRemote(entries){S.remote=new Map(entries);S.loaded=true;const cur=act
     if(id!==cur&&(r.updatedAt||'')>=(d.data.updatedAt||''))drafts.delete(id)}
   if(S.saveState==='')setSave('');renderSoon()}
 
-const APP_VERSION='2026-10-24.6';
+const APP_VERSION='2026-10-24.7';
 const K={w:'ll.workouts.v1',s:'ll.strong.v1',t:'ll.templates.v1',c:'ll.cardio.v1',sv:'ll.strava.v1'};
 function lsRead(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
 function lsWrite(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
@@ -645,12 +645,12 @@ const ALT=[[/squat|leg press|lunge|step up|hack/i],[/deadlift|rdl|hip thrust|goo
 function altsFor(name){const gs=ALT.filter(([a,b])=>a.test(name)&&!(b&&b.test(name)));if(!gs.length)return [];
   const used=exNames();const pool=[...new Set([...[...used.keys()].sort((a,b)=>used.get(b)-used.get(a)),...LIB])];
   return pool.filter(n=>n!==name&&gs.some(([a,b])=>a.test(n)&&!(b&&b.test(n)))).slice(0,10)}
-function setTxt(w,r,k){return k==='sec'?(w?fw(w)+' lb · ':'')+fmtSecs(r):k==='dist'?(w?fw(w)+' lb · ':'')+r+' m':w?fw(w)+'×'+r:r+' reps'}
-function targetsTxt(sets,k){const t=sets.map(q=>setTxt(q.tw,q.tr,k));if(!t.length)return 'no sets';return t.every(v=>v===t[0])?t.length+' × '+t[0]:t.join(', ')}
+function tgtTxt(w,r,k){return k==='sec'?(w?fw(w)+' lb · ':'')+fmtSecs(r):k==='dist'?(w?fw(w)+' lb · ':'')+r+' m':w?fw(w)+'×'+r:r+' reps'}
+function targetsTxt(sets,k){const t=sets.map(q=>tgtTxt(q.tw,q.tr,k));if(!t.length)return 'no sets';return t.every(v=>v===t[0])?t.length+' × '+t[0]:t.join(', ')}
 function livePrompt(d,why){const bi=blockInfo();const mins=Math.round((Date.now()-Date.parse(d.startedAt))/6e4);
   const lines=(d.exercises||[]).map((x,i)=>{const k=uk(x);const pv=prevSets(x.name,activeId());
     const done=x.sets.filter(q=>q.done),left=x.sets.map((q,si)=>({q,si})).filter(o=>!o.q.done);
-    const plan=left.map(({q,si})=>{const h=hint(x,si,pv);const w=q.w!=null?q.w:h.w,r=q[k]!=null?q[k]:h.r;return (q.t==='W'?'warm-up ':'')+(r==null?'?':setTxt(w,r,k))});
+    const plan=left.map(({q,si})=>{const h=hint(x,si,pv);const w=q.w!=null?q.w:h.w,r=q[k]!=null?q[k]:h.r;return (q.t==='W'?'warm-up ':'')+(r==null?'?':tgtTxt(w,r,k))});
     return `${i+1}. ${x.name}${k==='sec'?' (timed, seconds)':k==='dist'?' (distance, meters)':''}${x.ss?' [superset '+x.ss+']':''} · rest ${fmtSecs(exRest(x))}${x.note?' · note: '+x.note:''}
    done: ${done.length?done.map(q=>(q.t==='W'?'W ':'')+prevTxt(q,k)).join(', '):'none'}
    left: ${plan.length?plan.join(', '):'none'}`}).join('\n');
