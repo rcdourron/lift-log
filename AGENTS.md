@@ -39,7 +39,7 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 | `ll.intdone` | Interval session ticked off, keyed by the Monday of the week. |
 | `ll.insights.v1` | `{ [workoutId or Strava id]: {text, at} }` from the sheet's Insights tab. Read-only in the app. |
 | `ll.undo` | Snapshot `{id, exercises, plan, at}` taken before the last Claude adjustment or swap, for Undo. Cleared on finish. |
-| `ll.howto` | Cache of wger lookups `{ [exerciseName]: {status, data} }`. Delete to retry misses. |
+| `ll.howto.v2` / `ll.howto.pick` / `ll.wger.idx` | wger lookup cache, manual picks, and the cached wger name index (see External services). |
 
 ## Data model
 
@@ -136,7 +136,7 @@ Script Properties used: `TOKEN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `ST
 
 ## External services (all optional, online only)
 
-- **wger.de** (`loadHowto()`): `GET /api/v2/exercise-translation/?language=2&name=…` (exact, case-sensitive match) then `/api/v2/exerciseinfo/{id}/`. Strong names like `Squat (Barbell)` are tried as an alias from `HOW_ALIAS`, then the full name, then the name without the equipment suffix and plural forms. Images are CC-BY-SA and similar — keep the attribution line. Add aliases to `HOW_ALIAS` when an exercise doesn't match.
+- **wger.de** (`loadHowto()`): on first use the app downloads a name index of all English exercises (`exercise-translation`, `exerciseimage` and `exercise` lists, about 1.3 MB) and keeps a compact copy in `ll.wger.idx` for 30 days. `howMatch()` fuzzy-matches the Lift Log name against it: names are normalized (`HOW_SYN` handles plurals, pull-up/pullup, RDL and so on), the words outside the equipment in parentheses must match, extra words in the wger name cost points (modifiers like incline or seated cost more), equipment that matches gains points and conflicting equipment loses them, and entries with images are preferred. `HOW_ALIAS` maps a few names straight to a wger name. Then `/api/v2/exerciseinfo/{id}/` supplies images, muscles (relative URLs are made absolute with `wabs()`) and the description. Results are cached in `ll.howto.v2` (misses are retried after 14 days). Users can pick the right wger exercise by hand ("Wrong exercise? Pick another"), stored in `ll.howto.pick` as `{ [name]: wgerExerciseId }`. Images are CC-BY-SA and similar, so keep the attribution line.
 - **Claude:** "Ask Claude" opens `https://claude.ai/new?q=<prompt>` (prompt capped at 1800 chars, and it contains no workout numbers — Claude reads them from the sheet). If the user saved a project link in `ll.cfg.claudeUrl`, the prompt is copied to the clipboard and the project opens instead.
 - The service worker only caches same-origin files and Google Fonts; these requests go straight to the network.
 
