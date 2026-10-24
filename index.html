@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lift Log</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lift Log">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<meta name="theme-color" content="#EDF0F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1215" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column gym-floor logger. Sticky header, stacked exercise cards, rest bar and tab bar fixed to the bottom edge. */
+:root{
+  --bg:#EDF0F3; --surface:#FFFFFF; --sunk:#E2E6EB; --ink:#13171C; --muted:#5A646E; --line:#D3D9E0;
+  --accent:#C41E2A; --accent-ink:#FFFFFF; --accent-soft:#F8E3E4;
+  --done:#1B8447; --done-bg:#E1F2E7; --done-ink:#FFFFFF;
+  --plate45:#1F4ECC; --plate35:#E0B000; --plate25:#1B8447; --plate10:#8A939C;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:12px; --tab-h:58px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1215; --surface:#181C21; --sunk:#22272D; --ink:#ECEFF2; --muted:#97A0AA; --line:#2C333A;
+    --accent:#F2464F; --accent-ink:#FFFFFF; --accent-soft:#3A1A1D;
+    --done:#3CBF70; --done-bg:#16301F; --done-ink:#08140C;
+    --plate45:#6F93FF; --plate35:#F0C838; --plate25:#3CBF70; --plate10:#7C858F;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1215; --surface:#181C21; --sunk:#22272D; --ink:#ECEFF2; --muted:#97A0AA; --line:#2C333A;
+  --accent:#F2464F; --accent-ink:#FFFFFF; --accent-soft:#3A1A1D;
+  --done:#3CBF70; --done-bg:#16301F; --done-ink:#08140C;
+  --plate45:#6F93FF; --plate35:#F0C838; --plate25:#3CBF70; --plate10:#7C858F;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+[hidden]{display:none!important}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tab-h) + 14px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 10px 10px 14px;display:flex;align-items:center;gap:12px;font-size:15px;box-shadow:0 6px 24px rgba(0,0,0,.25);width:max-content;max-width:calc(100% - 32px)}
+.toast button{border:0;background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px;min-height:36px;white-space:nowrap}
+.toast.msg{padding:12px 16px}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 10px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.brand i{display:inline-block;width:6px;height:20px;background:var(--accent);border-radius:2px}
+.save{font-size:13px;color:var(--muted);white-space:nowrap}
+.save.err{color:var(--accent);font-weight:600}
+
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px calc(var(--tab-h) + 96px + env(safe-area-inset-bottom,0px));max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.banner{background:var(--accent-soft);color:var(--ink);border-radius:var(--r);padding:10px 12px;font-size:14px}
+
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+
+.btn{border:0;border-radius:10px;padding:12px 16px;font-weight:600;font-size:16px;background:var(--sunk);color:var(--ink);min-height:44px}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.block{width:100%}
+.btn.small{padding:8px 12px;min-height:36px;font-size:14px}
+.btn.ghost{background:transparent;color:var(--muted)}
+.btn.warn{background:var(--accent-soft);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.split{justify-content:space-between}
+
+/* start screen */
+.hero{display:flex;flex-direction:column;gap:14px;padding-block:6px}
+.hero h1{font-size:40px;line-height:1;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{background:var(--surface);border-radius:var(--r);padding:10px 12px;min-width:0}
+.stat b{display:block;font-family:var(--display);font-size:28px;font-weight:600;line-height:1.1}
+.stat span{font-size:12px;color:var(--muted)}
+.panel{background:var(--surface);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.empty{text-align:left;padding:18px 14px;border:1.5px dashed var(--line);border-radius:var(--r);color:var(--muted);font-size:15px}
+
+/* workout editor */
+.whead{display:flex;flex-direction:column;gap:6px}
+.wname{font-family:var(--display);font-size:32px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;background:transparent;border:0;border-bottom:2px solid transparent;padding:0;width:100%;min-width:0}
+.wname:focus{outline:none;border-bottom-color:var(--accent)}
+.wmeta{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.wmeta b{color:var(--ink);font-weight:600}
+.ex{background:var(--surface);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.exhead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.exname{font-size:22px;font-weight:700;letter-spacing:.01em;line-height:1.1}
+.last{font-size:13px;color:var(--muted)}
+.sets{display:flex;flex-direction:column;gap:4px}
+.srow{display:grid;grid-template-columns:26px minmax(0,1fr) 68px 56px 44px;gap:8px;align-items:center;border-radius:8px;padding:3px 4px}
+.srow.h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-block:0}
+.srow.done{background:var(--done-bg)}
+.sn{font-family:var(--display);font-weight:600;font-size:18px;text-align:center}
+.prev{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell{width:100%;min-width:0;text-align:center;border:1px solid var(--line);background:var(--sunk);border-radius:8px;padding:8px 2px;font-family:var(--display);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.cell::placeholder{color:var(--muted);opacity:.6;font-weight:500}
+.cell:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+.srow.done .cell{background:transparent;border-color:transparent}
+.chk{width:44px;height:40px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.chk svg{width:20px;height:20px;stroke:var(--muted)}
+.srow.done .chk{background:var(--done);border-color:var(--done)}
+.srow.done .chk svg{stroke:var(--done-ink)}
+.plates{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.pstack{display:flex;align-items:center;gap:2px}
+.pl{display:inline-block;width:7px;border-radius:2px;background:var(--plate10)}
+.pl.p45{height:26px;background:var(--plate45)} .pl.p35{height:23px;background:var(--plate35)} .pl.p25{height:19px;background:var(--plate25)}
+.pl.p10{height:14px} .pl.p5{height:11px;width:5px} .pl.p2{height:9px;width:4px}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--surface);border-radius:16px 16px 0 0;max-height:78%;display:flex;flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px calc(14px + env(safe-area-inset-bottom,0px));gap:10px;max-width:640px;margin:0 auto}
+.search{width:100%;border:1px solid var(--line);background:var(--sunk);border-radius:10px;padding:12px;font-size:16px}
+.plist{overflow-y:auto;display:flex;flex-direction:column;min-height:0}
+.pitem{display:flex;justify-content:space-between;gap:8px;align-items:center;border:0;background:transparent;text-align:left;padding:12px 4px;border-bottom:1px solid var(--line);font-size:16px}
+.pitem small{color:var(--muted);font-size:12px;white-space:nowrap}
+textarea.notes{width:100%;min-height:70px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:10px 12px;font-size:15px;resize:vertical}
+
+/* history */
+.hcard{background:var(--surface);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.hdate{font-size:13px;color:var(--muted)}
+.hname{font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.hlines{display:flex;flex-direction:column;gap:3px;font-size:15px}
+.hline{display:flex;justify-content:space-between;gap:10px}
+.hline span:last-child{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.src{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);border-radius:4px;padding:1px 6px;white-space:nowrap}
+.src.mine{border-color:var(--accent);color:var(--accent)}
+.tpl{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-block:10px;border-top:1px solid var(--line)}
+.xnote{font-size:13px;color:var(--ink);opacity:.85}
+.plan{font-size:14px;color:var(--muted);border-left:3px solid var(--accent);padding-left:10px}
+.month{font-family:var(--display);font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:6px}
+
+/* progress */
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chip{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:14px;white-space:nowrap}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--body);font-size:11px}
+.chart .end{fill:var(--ink);font-family:var(--display);font-size:15px;font-weight:600}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:6px 4px;border-bottom:1px solid var(--line)}
+.tbl td{padding:8px 4px;border-bottom:1px solid var(--line)}
+.tbl td:not(:first-child),.tbl th:not(:first-child){text-align:right}
+.pr{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;background:var(--accent);color:var(--accent-ink);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:1px}
+
+/* rest bar + tabs */
+.rest{position:fixed;left:0;right:0;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom,0px));z-index:6;background:var(--ink);color:var(--bg);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px;display:flex;align-items:center;gap:10px}
+.rest .t{font-family:var(--display);font-size:26px;font-weight:700;min-width:64px}
+.rest .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;flex:1}
+.rest button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:8px;padding:6px 10px;font-size:14px;min-height:36px}
+.rest .bar{position:absolute;left:0;top:0;height:3px;background:var(--accent);transition:width 1s linear}
+.rest.over{background:var(--done);color:var(--done-ink)}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:7;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab{border:0;background:transparent;height:var(--tab-h);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted);position:relative}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--accent)}
+.tab.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;background:var(--accent);border-radius:0 0 3px 3px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><i></i>Lift Log</div>
+  <div class="save" id="save">Connecting…</div>
+</header>
+<main id="main">
+  <div class="empty">Loading your workouts…</div>
+</main>
+<div id="restWrap"></div>
+<div id="sheetWrap"></div>
+<nav class="tabs" id="tabs">
+  <button class="tab" data-act="tab" data-v="workout" id="tab-workout"><svg viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></svg>Workout</button>
+  <button class="tab" data-act="tab" data-v="history" id="tab-history"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>History</button>
+  <button class="tab" data-act="tab" data-v="progress" id="tab-progress"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 16l4-5 4 3 6-8"/></svg>Progress</button>
+  <button class="tab" data-act="tab" data-v="data" id="tab-data"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 19h14"/></svg>Data</button>
+</nav>
+
+<script>
+(function(){
+const LIB=["Squat (Barbell)","Front Squat (Barbell)","Deadlift (Barbell)","Romanian Deadlift (Barbell)","Trap Bar Deadlift","Bench Press (Barbell)","Incline Bench Press (Barbell)","Overhead Press (Barbell)","Bent Over Row (Barbell)","Pull Up","Chin Up","Lat Pulldown (Cable)","Seated Row (Cable)","Bench Press (Dumbbell)","Incline Bench Press (Dumbbell)","Shoulder Press (Dumbbell)","Arnold Press (Dumbbell)","Bent Over One Arm Row (Dumbbell)","Bulgarian Split Squat","Lunge (Dumbbell)","Goblet Squat (Kettlebell)","Leg Press","Hip Thrust (Barbell)","Lying Leg Curl (Machine)","Leg Extension (Machine)","Seated Calf Raise (Plate Loaded)","Bicep Curl (Dumbbell)","Hammer Curl (Dumbbell)","Triceps Pushdown (Cable - Straight Bar)","Skullcrusher (Barbell)","Chest Dip","Lateral Raise (Dumbbell)","Face Pull (Cable)","Back Extension","Plank","Side Plank","Dead Bug","Bird Dog","Pallof Press","Glute Bridge","Farmers Walk"];
+const TIMED=new Set(["Plank","Side Plank","Wall Sit","Copenhagen Plank","Dead Hang"]);
+const uk=x=>x.unit==='m'?'dist':(x.unit==='sec'||(!x.unit&&TIMED.has(x.name)))?'sec':'r';
+const isBarbell=n=>/\(Barbell\)/.test(n)&&/Squat|Bench|Deadlift|Press|Row|Lunge|Thrust|Clean|Shrug/.test(n)&&!/Curl|Skull/.test(n);
+const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+const $=id=>document.getElementById(id);
+const main=$('main');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>{if(v==null||v==='')return null;const n=parseFloat(String(v).replace(',','.'));return isFinite(n)&&n>=0?n:null};
+const fw=w=>w==null?'':String(Math.round(w*100)/100);
+const e1=(w,r)=>(w>0&&r>0)?(r===1?w:w*(1+r/30)):0;
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const fmtDate=iso=>{const d=new Date(iso);return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})};
+const fmtShort=iso=>new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+const fmtDur=ms=>{if(!(ms>0))return '0:00';const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`:`${m}:${String(x).padStart(2,'0')}`};
+const fmtMin=ms=>{const m=Math.round(ms/60000);return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m} min`};
+const fmtVol=v=>v>=10000?(Math.round(v/100)/10)+'k':Math.round(v).toLocaleString();
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+const S={remote:new Map(),loaded:false,tab:'workout',editId:null,picker:false,q:'',confirm:null,prog:null,range:'1y',histN:30,strong:new Map(),strongMeta:null,templates:[],mode:'connecting',saveState:'',banner:''};
+const drafts=new Map();
+let store=null, pendingRender=false;
+let rest={until:0,len:lsGet('ll.rest',120),timer:null,doneAt:0};
+
+/* ---------- data ---------- */
+function getW(id){const d=drafts.get(id);return d?d.data:(S.remote.get(id)||S.strong.get(id))}
+function all(){const ids=new Set([...S.remote.keys(),...drafts.keys(),...S.strong.keys()]);const out=[];ids.forEach(id=>{const w=getW(id);if(w)out.push({id,...w})});return out.sort((a,b)=>(Date.parse(b.startedAt)||0)-(Date.parse(a.startedAt)||0))}
+function finished(){return all().filter(w=>w.finished)}
+function activeId(){if(S.editId&&getW(S.editId))return S.editId;const a=all().find(w=>!w.finished);return a?a.id:null}
+function ensureDraft(id){let d=drafts.get(id);if(!d){d={data:JSON.parse(JSON.stringify(S.remote.get(id)||{})),dirty:false,inflight:false,timer:null};drafts.set(id,d)}return d}
+function touch(id,now){const d=ensureDraft(id);d.dirty=true;d.data.updatedAt=new Date().toISOString();clearTimeout(d.timer);d.timer=setTimeout(()=>{d.timer=null;flush(id)},now?0:600);setSave('saving')}
+async function flush(id){const d=drafts.get(id);if(!d||d.inflight||!d.dirty)return;d.dirty=false;d.inflight=true;const body=JSON.parse(JSON.stringify(d.data));
+  try{await store.set(id,body);d.failed=0;setSave(anyPending()?'saving':'saved')}
+  catch(e){d.dirty=true;d.failed=(d.failed||0)+1;
+    if(e&&e.code==='unavailable'&&d.failed<3){d.timer=setTimeout(()=>{d.timer=null;flush(id)},1500+Math.random()*1500)}
+    else setSave('error',e&&e.code==='quota_exceeded'?'This phone’s storage for Lift Log is full. Export a backup from the Data tab, then delete some old workouts.':'Not saved. Your phone may be out of storage; export a backup from the Data tab.')}
+  finally{d.inflight=false;if(d.dirty&&!d.timer&&!d.failed){d.timer=setTimeout(()=>{d.timer=null;flush(id)},600)}}}
+function anyPending(){for(const d of drafts.values())if(d.dirty||d.inflight)return true;return false}
+function setSave(st,msg){S.saveState=st;const el=$('save');el.classList.toggle('err',st==='error');
+  el.textContent=st==='saving'?'Saving…':st==='error'?'Not saved':st==='saved'?'Saved':S.mode==='local'?'On this phone':'Loading…';
+  if(st==='error'){S.banner=msg;render()}}
+function onRemote(entries){S.remote=new Map(entries);S.loaded=true;const cur=activeId();
+  for(const [id,d] of drafts){if(d.dirty||d.inflight||d.timer)continue;const r=S.remote.get(id);
+    if(!r){drafts.delete(id);continue}
+    if(id!==cur&&(r.updatedAt||'')>=(d.data.updatedAt||''))drafts.delete(id)}
+  if(S.saveState==='')setSave('');renderSoon()}
+
+const APP_VERSION='2026-10-24.2';
+const K={w:'ll.workouts.v1',s:'ll.strong.v1',t:'ll.templates.v1'};
+function lsRead(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
+function lsWrite(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
+function applyStrong(st){const m=new Map();((st&&st.workouts)||[]).forEach(w=>m.set(w.sid,{...w,source:'strong',finished:true}));S.strong=m;S.strongMeta=(st&&st.meta)||null}
+function applyTemplates(tp){S.templates=(tp||[]).slice().sort((a,b)=>(a.order||0)-(b.order||0))}
+async function connect(){
+  S.mode='local';
+  store={
+    set:async(id,b)=>{const m=lsRead(K.w)||{};m[id]=b;if(!lsWrite(K.w,m))throw {code:'quota_exceeded'};onRemote(Object.entries(m));if(b.finished)markSync(id)},
+    del:async id=>{const m=lsRead(K.w)||{};delete m[id];if(!lsWrite(K.w,m))throw {code:'quota_exceeded'};onRemote(Object.entries(m));markDel(id)}
+  };
+  let st=lsRead(K.s),tp=lsRead(K.t);
+  if(!st||!tp){try{const r=await fetch('./seed.json');if(r.ok){const seed=await r.json();
+    if(!st&&seed.strong){st=seed.strong;lsWrite(K.s,st)}if(!tp&&seed.templates){tp=seed.templates;lsWrite(K.t,tp)}}}catch(e){}}
+  applyStrong(st);applyTemplates(tp);
+  try{if(navigator.storage&&navigator.storage.persist){S.persisted=await navigator.storage.persist()}}catch(e){}
+  setSave('');onRemote(Object.entries(lsRead(K.w)||{}));
+  schedSync(2000);
+}
+function flushAll(){for(const [id,d] of drafts){if(d.dirty&&!d.inflight){clearTimeout(d.timer);d.timer=null;flush(id)}}}
+window.__llFlush=flushAll;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushAll()});
+window.addEventListener('pagehide',flushAll);
+window.addEventListener('storage',e=>{if(e.key===K.w)onRemote(Object.entries(lsRead(K.w)||{}));if(e.key===K.s){applyStrong(lsRead(K.s));renderSoon()}if(e.key===K.t){applyTemplates(lsRead(K.t));renderSoon()}});
+
+/* ---------- Strong CSV import ---------- */
+function parseCSV(t){t=t.replace(/^﻿/,'');const first=t.slice(0,t.indexOf('\n')>0?t.indexOf('\n'):t.length);const D=(first.includes(';')&&!first.includes(','))?';':',';
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===D){row.push(f);f=''}
+    else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);if(row.length>1||row[0]!=='')rows.push(row);row=[];f=''}
+    else f+=c}
+  if(f!==''||row.length){row.push(f);rows.push(row)}return rows}
+function strongFromCSV(text,fileName){const rows=parseCSV(text);if(rows.length<2)throw new Error('That file is empty.');
+  const H=rows[0].map(x=>x.trim());const col=n=>H.indexOf(n);
+  const need=['Date','Workout Name','Exercise Name','Set Order','Weight','Reps'];const miss=need.filter(n=>col(n)<0);
+  if(miss.length)throw new Error('This doesn’t look like a Strong export (missing '+miss.join(', ')+').');
+  const g=(r,n)=>{const k=col(n);return k<0?'':(r[k]??'')};const fnum=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:0};const clean=n=>Math.round(n*100)/100;
+  const dur=v=>{const h=/(\d+)h/.exec(v||''),m=/(\d+)m/.exec(v||''),x=/(\d+)s/.exec(v||'');return ((h?+h[1]:0)*3600+(m?+m[1]:0)*60+(x?+x[1]:0))*1000};
+  const ws=new Map();
+  for(const r of rows.slice(1)){const so=g(r,'Set Order').trim();if(so==='Rest Timer')continue;const ds=g(r,'Date').trim();
+    const mt=/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(ds);if(!mt)continue;
+    if(!ws.has(ds)){const st=new Date(+mt[1],+mt[2]-1,+mt[3],+mt[4],+mt[5],+(mt[6]||0));
+      ws.set(ds,{sid:'strong-'+mt[1]+mt[2]+mt[3]+'T'+mt[4]+mt[5]+(mt[6]||'00'),name:g(r,'Workout Name')||'Workout',startedAt:st.toISOString(),endedAt:new Date(st.getTime()+dur(g(r,'Duration'))).toISOString(),notes:'',exercises:[]})}
+    const w=ws.get(ds);const wn=g(r,'Workout Notes');if(wn&&!w.notes)w.notes=wn;
+    const wt=fnum(g(r,'Weight')),rp=fnum(g(r,'Reps'));if(wt===1&&rp===1)continue;
+    const set={w:clean(wt),r:rp?clean(rp):null,done:true};if(so&&!/^\d+$/.test(so))set.t=so;
+    const rpe=g(r,'RPE');if(rpe)set.rpe=clean(fnum(rpe));const sec=fnum(g(r,'Seconds'));if(sec>0)set.sec=clean(sec);const dist=fnum(g(r,'Distance'));if(dist>0)set.dist=clean(dist);
+    const nt=g(r,'Notes');if(nt)set.note=nt;
+    const ex=g(r,'Exercise Name');const exs=w.exercises;if(!exs.length||exs[exs.length-1].name!==ex)exs.push({name:ex,sets:[]});exs[exs.length-1].sets.push(set)}
+  const workouts=[...ws.values()].map(w=>({...w,exercises:w.exercises.filter(x=>x.sets.length)})).filter(w=>w.exercises.length);
+  if(!workouts.length)throw new Error('No workouts found in that file.');
+  const ts=workouts.map(w=>w.startedAt).sort();
+  return {workouts,meta:{source:'Strong CSV export',file:fileName||'',importedAt:new Date().toISOString(),workouts:workouts.length,first:ts[0],last:ts[ts.length-1]}}}
+
+/* ---------- Google Sheets sync ---------- */
+const SK='ll.sync.v1';const p2=n=>String(n).padStart(2,'0');
+let SY=lsRead(SK)||{url:'',token:'',pend:[],dels:[],strong:false,last:null,err:''};
+let syncing=false,syncT=null;
+function saveSY(){lsWrite(SK,SY)}
+function localStamp(iso){const d=new Date(iso);return isNaN(d)?'':d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes())}
+function rowsFor(id,w,source){const date=localStamp(w.startedAt);const mins=w.endedAt?Math.round((Date.parse(w.endedAt)-Date.parse(w.startedAt))/60000):'';
+  const srows=[];(w.exercises||[]).forEach(x=>{let n=0;x.sets.filter(q=>q.done).forEach(q=>{const lab=q.t==='W'?'W':(q.t||String(++n));
+    srows.push([id,date,w.name||'',x.name,lab,q.t||'',q.w??'',q.r??'',q.sec??'',q.dist??'',q.rpe??'',q.note||'',source])})});
+  const body={...w};delete body.source;
+  return {id,wrow:[id,date,w.name||'',source,w.template||'',mins,doneCount(w),Math.round(workVol(w)),w.notes||'',w.updatedAt||'',JSON.stringify(body)],srows}}
+function markSync(id){if(!SY.url)return;if(!SY.pend.includes(id))SY.pend.push(id);SY.dels=SY.dels.filter(x=>x!==id);saveSY();schedSync(3000)}
+function markDel(id){if(!SY.url)return;SY.pend=SY.pend.filter(x=>x!==id);if(!SY.dels.includes(id))SY.dels.push(id);saveSY();schedSync(3000)}
+function pendingCount(){return SY.pend.length+SY.dels.length}
+function schedSync(ms){if(!SY.url)return;clearTimeout(syncT);syncT=setTimeout(()=>syncNow(false),ms)}
+async function syncNow(manual){
+  if(!SY.url||syncing)return;
+  if(navigator.onLine===false){if(manual)flash('You’re offline. Lift Log will sync when you’re back online.');return}
+  if(!manual&&!pendingCount()&&!SY.strong)return;
+  syncing=true;if(S.tab==='data')renderSoon();
+  const mine=lsRead(K.w)||{};const ids=SY.pend.slice(),dels=SY.dels.slice(),doStrong=SY.strong;
+  const body={op:'sync',token:SY.token,appVersion:APP_VERSION,
+    upserts:ids.filter(id=>mine[id]&&mine[id].finished).map(id=>rowsFor(id,mine[id],'lift-log')),
+    deletes:dels.concat(ids.filter(id=>!(mine[id]&&mine[id].finished))),templates:lsRead(K.t)||[]};
+  if(doStrong){const st=lsRead(K.s);body.strong=((st&&st.workouts)||[]).map(w=>rowsFor(w.sid,w,'strong'))}
+  try{
+    const r=await fetch(SY.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'});
+    let res;try{res=await r.json()}catch(e){throw new Error('Your sheet answered with a sign-in page. In Apps Script, redeploy the web app with access set to Anyone.')}
+    if(!res.ok)throw new Error(res.error==='bad_token'?'That sheet is already linked to another copy of Lift Log. Use a new script deployment to relink it.':'Your sheet reported an error: '+(res.error||'unknown'));
+    SY.pend=SY.pend.filter(x=>!ids.includes(x));SY.dels=SY.dels.filter(x=>!dels.includes(x));if(doStrong)SY.strong=false;SY.last=new Date().toISOString();SY.err='';
+    if(Array.isArray(res.templates)&&res.templates.length&&JSON.stringify(res.templates)!==JSON.stringify(lsRead(K.t)||[])){lsWrite(K.t,res.templates);applyTemplates(res.templates);renderSoon()}
+    saveSY();if(manual)flash('Synced to Google Sheets.');
+  }catch(e){SY.err=(e instanceof TypeError)?'Couldn’t reach your sheet. Check the web app URL, then try again.':(e.message||'Sync failed.');saveSY();if(manual)flash(SY.err)}
+  finally{syncing=false;if(S.tab==='data')renderSoon()}}
+async function connectSheet(url){url=(url||'').trim();
+  if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){flash('Paste the Web app URL from Apps Script. It starts with https://script.google.com/macros/s/');return}
+  const a=new Uint8Array(16);crypto.getRandomValues(a);
+  SY={url,token:[...a].map(b=>b.toString(16).padStart(2,'0')).join(''),pend:Object.entries(lsRead(K.w)||{}).filter(([,w])=>w.finished).map(([id])=>id),dels:[],strong:true,last:null,err:''};
+  saveSY();render();await syncNow(true)}
+window.addEventListener('online',()=>schedSync(500));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')schedSync(1500)});
+setInterval(()=>{if(document.visibilityState==='visible')syncNow(false)},5*60*1000);
+const ago=iso=>{const m=Math.round((Date.now()-Date.parse(iso))/60000);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':fmtShort(iso)};
+
+/* ---------- backup ---------- */
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+async function exportBackup(){flushAll();
+  const data={app:'lift-log',format:1,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),workouts:lsRead(K.w)||{},templates:lsRead(K.t)||[],strong:lsRead(K.s)};
+  const name='lift-log-backup-'+today()+'.json';const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  try{const file=new File([blob],name,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Lift Log backup'});flash('Backup ready.');return}}
+  catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);flash('Backup saved to Downloads.')}
+function readBackup(text){let d;try{d=JSON.parse(text)}catch(e){throw new Error('That file isn’t a Lift Log backup.')}
+  if(!d||d.app!=='lift-log'||typeof d.workouts!=='object')throw new Error('That file isn’t a Lift Log backup.');return d}
+function restoreBackup(d){if(!lsWrite(K.w,d.workouts||{})||!lsWrite(K.t,d.templates||[])||(d.strong&&!lsWrite(K.s,d.strong)))throw new Error('Not enough storage on this phone to restore.');
+  drafts.clear();if(SY.url){SY.pend=Object.entries(d.workouts||{}).filter(([,w])=>w.finished).map(([id])=>id);SY.strong=true;saveSY();schedSync(1000)}applyStrong(lsRead(K.s));applyTemplates(lsRead(K.t));onRemote(Object.entries(lsRead(K.w)||{}))}
+let flashT=null;function flash(msg){let t=$('msgToast');if(!t){t=document.createElement('div');t.id='msgToast';t.className='toast msg';t.setAttribute('role','status');document.body.appendChild(t)}
+  t.textContent=msg;clearTimeout(flashT);flashT=setTimeout(()=>t.remove(),3200)}
+
+/* ---------- history helpers ---------- */
+function prevSets(name,excludeId){const ws=finished().filter(w=>w.id!==excludeId);
+  for(const w of ws){const ex=(w.exercises||[]).find(x=>x.name===name);if(ex){const s=ex.sets.filter(x=>x.done);if(s.length)return {date:w.startedAt,sets:s}}}return null}
+function exNames(){const c=new Map();finished().forEach(w=>(w.exercises||[]).forEach(x=>c.set(x.name,(c.get(x.name)||0)+1)));return c}
+function workVol(w){let v=0;(w.exercises||[]).forEach(x=>x.sets.forEach(s=>{if(s.done&&s.w&&s.r)v+=s.w*s.r}));return v}
+function doneCount(w){let n=0;(w.exercises||[]).forEach(x=>x.sets.forEach(s=>{if(s.done)n++}));return n}
+function bestSet(sets){let b=null;sets.forEach(s=>{if(!s.done||s.t==='W')return;const e=e1(s.w,s.r);const k=e||((s.w||0)*1000+(s.r||0));if(!b||k>b.k)b={...s,k,e}});return b}
+function setTxt(s){if(!s)return '—';return s.w?`${fw(s.w)}×${s.r??'–'}`:s.r?`${s.r} reps`:s.sec?`${fw(s.sec)}s`:s.dist?`${fw(s.dist)} dist`:'–'}
+function plates(w){if(!(w>45))return null;let side=(w-45)/2;const out=[];for(const p of [45,35,25,10,5,2.5])while(side>=p-1e-9){out.push(p);side-=p}return {out,rem:Math.round(side*100)/100}}
+
+/* ---------- render ---------- */
+function renderSoon(){const a=document.activeElement;if(a&&main.contains(a)&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')){pendingRender=true;return}render()}
+document.addEventListener('focusout',e=>{if(!pendingRender)return;const n=e.relatedTarget;if(n&&main.contains(n)&&(n.tagName==='INPUT'||n.tagName==='TEXTAREA'))return;setTimeout(()=>{if(pendingRender){pendingRender=false;render()}},0)});
+
+function render(){pendingRender=false;
+  ['workout','history','progress','data'].forEach(t=>$('tab-'+t).classList.toggle('on',S.tab===t));
+  let h=S.banner?`<div class="banner">${esc(S.banner)}</div>`:'';
+  if(!S.loaded)h+=`<div class="empty">Loading your workouts…</div>`;
+  else if(S.tab==='workout'){const id=activeId();h+=id?editor(id):startScreen()}
+  else if(S.tab==='history')h+=history();
+  else if(S.tab==='progress')h+=progress();
+  else h+=dataView();
+  main.innerHTML=h;renderSheet();renderRest();tick()}
+
+function startScreen(){const fs=finished();const now=new Date();const mon=new Date(now);mon.setHours(0,0,0,0);mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+  const wk=fs.filter(w=>new Date(w.startedAt)>=mon);const vol=wk.reduce((a,w)=>a+workVol(w),0);const last=fs[0];
+  let h=`<section class="hero"><div class="eyebrow">${esc(now.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))}</div><h1>Ready to lift</h1>
+  <div class="stats"><div class="stat"><b class="num">${wk.length}</b><span>workouts this week</span></div><div class="stat"><b class="num">${fmtVol(vol)}</b><span>lb moved this week</span></div><div class="stat"><b class="num">${fs.length}</b><span>logged all time</span></div></div>
+  ${S.templates.length?'':'<button class="btn primary block" data-act="start">Start workout</button>'}</section>`;
+  if(S.templates.length)h+=`<section class="panel"><div class="eyebrow">Templates</div>${S.templates.map(t=>`<div class="tpl"><div style="min-width:0"><h3 class="hname">${esc(t.name)}</h3><div class="muted" style="font-size:14px">${esc(t.summary||'')}</div></div><button class="btn small primary" data-act="tpl" data-id="${esc(t.id)}">Start</button></div>`).join('')}</section><button class="btn block" data-act="start">Start empty workout</button>`;
+  if(last){h+=`<section class="panel"><div class="eyebrow">Last workout · ${esc(fmtDate(last.startedAt))}</div><h3 class="hname">${esc(last.name)}</h3><div class="hlines">${(last.exercises||[]).map(x=>{const b=bestSet(x.sets);return `<div class="hline"><span>${esc(x.name)}</span><span>${x.sets.filter(s=>s.done).length} sets${b?' · top '+setTxt(b):''}</span></div>`}).join('')}</div></section>`}
+  else h+=`<div class="empty">No workouts yet. Tap <b>Start workout</b>, add an exercise, and check off each set as you go. Every finished workout lands in History, and your lifts chart themselves under Progress.</div>`;
+  return h}
+
+function editor(id){const w=getW(id);const past=!!w.finished;const ex=w.exercises||[];
+  let h=`<section class="whead"><div class="eyebrow">${past?'Editing · '+esc(fmtDate(w.startedAt))+(w.source==='strong'?' · from Strong':''):'In progress'}</div>
+  <input class="wname" id="wname" data-f="name" data-w="${id}" value="${esc(w.name)}" aria-label="Workout name">
+  <div class="wmeta"><span>${past?'Duration':'Elapsed'} <b class="num" data-elapsed="${id}">${past?fmtMin(new Date(w.endedAt)-new Date(w.startedAt)):fmtDur(Date.now()-new Date(w.startedAt))}</b></span><span>Sets <b class="num" id="mset">${doneCount(w)}</b></span><span>Volume <b class="num" id="mvol">${fmtVol(workVol(w))}</b> lb</span></div></section>`;
+  if(w.plan)h+=`<div class="plan">${esc(w.plan)}</div>`;
+  if(!ex.length)h+=`<div class="empty">Add your first exercise. Last time's numbers show up as gray hints, so you can just tap ✓ to repeat them.</div>`;
+  ex.forEach((x,ei)=>{const pv=prevSets(x.name,id);
+    const lastTxt=pv?`Last · ${esc(fmtShort(pv.date))}: ${pv.sets.map(setTxt).join(', ')}`:'First time logging this';
+    const rk='rmex'+ei;
+    h+=`<section class="ex" id="ex-${ei}"><div class="exhead"><div style="min-width:0"><h2 class="exname">${esc(x.name)}</h2><div class="last">${lastTxt}</div>${x.note?`<div class="xnote">${esc(x.note)}${x.rest?` · Rest ${fmtDur(x.rest*1000)}`:''}</div>`:''}</div>
+    <button class="btn small ${S.confirm===rk?'warn':'ghost'}" data-act="rmex" data-e="${ei}">${S.confirm===rk?'Remove?':'Remove'}</button></div>
+    <div class="sets"><div class="srow h"><span style="text-align:center">Set</span><span>Previous</span><span style="text-align:center">lb</span><span style="text-align:center">${x.unit==='m'?'Meters':uk(x)==='sec'?'Sec':'Reps'}</span><span></span></div>`;
+    const k=uk(x);let wn=0;
+    x.sets.forEach((s,si)=>{const ph=hint(x,si,pv);const lab=s.t==='W'?'W':(s.t&&s.t!=='W'?s.t:++wn);
+      h+=`<div class="srow${s.done?' done':''}"><span class="sn">${lab}</span><span class="prev">${pv&&pv.sets[si]?setTxt(pv.sets[si]):'—'}</span>
+      <input class="cell" id="w-${ei}-${si}" inputmode="decimal" autocomplete="off" data-f="w" data-w="${id}" data-e="${ei}" data-s="${si}" value="${fw(s.w)}" placeholder="${ph.w?fw(ph.w):''}" aria-label="Set ${si+1} weight">
+      <input class="cell" id="r-${ei}-${si}" inputmode="numeric" autocomplete="off" data-f="r" data-w="${id}" data-e="${ei}" data-s="${si}" value="${s[k]??''}" placeholder="${ph.r??''}" aria-label="Set ${si+1} ${k==='r'?'reps':k==='sec'?'seconds':'meters'}">
+      <button class="chk" data-act="chk" data-e="${ei}" data-s="${si}" aria-label="${s.done?'Mark set '+(si+1)+' not done':'Complete set '+(si+1)}" aria-pressed="${s.done}">${CHECK}</button></div>`});
+    h+=`</div>`;
+    if(isBarbell(x.name)){const top=Math.max(0,...x.sets.map(s=>s.w||0));const p=plates(top);
+      if(p)h+=`<div class="plates"><span>Per side for <b class="num">${fw(top)}</b> on a 45 lb bar</span><span class="pstack">${p.out.map(v=>`<i class="pl p${v===2.5?2:v}" title="${v}"></i>`).join('')}</span><span class="num">${p.out.join(' · ')}${p.rem?` (+${p.rem} unmatched)`:''}</span></div>`}
+    h+=`<div class="row"><button class="btn small" data-act="addset" data-e="${ei}">+ Add set</button>${x.sets.length>1?`<button class="btn small ghost" data-act="rmset" data-e="${ei}">Remove last set</button>`:''}</div></section>`});
+  h+=`<button class="btn block" data-act="picker">+ Add exercise</button>
+  <textarea class="notes" id="notes" data-f="notes" data-w="${id}" placeholder="Notes: how it felt, anything to remember next time">${esc(w.notes||'')}</textarea>`;
+  if(past){h+=`<div class="row split"><button class="btn ${S.confirm==='delcur'?'warn':'ghost'}" data-act="delcur">${S.confirm==='delcur'?'Delete this workout?':'Delete'}</button><button class="btn primary" data-act="doneedit">Done editing</button></div>`}
+  else{const unchecked=ex.reduce((a,x)=>a+x.sets.filter(s=>!s.done).length,0);const dc=doneCount(w);
+    h+=`<div class="row split"><button class="btn ${S.confirm==='discard'?'warn':'ghost'}" data-act="discard">${S.confirm==='discard'?'Discard workout?':'Discard'}</button>
+    <button class="btn primary" data-act="finish" ${dc?'':'disabled'}>${S.confirm==='finish'?`Drop ${unchecked} unchecked & finish`:'Finish workout'}</button></div>`;
+    if(!dc&&ex.length)h+=`<div class="muted" style="font-size:13px;text-align:right">Check off at least one set to finish.</div>`}
+  return h}
+
+function hint(x,si,pv){const k=uk(x),s0=x.sets[si];if(s0&&(s0.tw!=null||s0.tr!=null))return {w:s0.tw,r:s0.tr};
+  const p=pv&&pv.sets[si];if(p)return {w:p.w,r:p[k]};
+  for(let i=si-1;i>=0;i--){const s=x.sets[i];if(s.w!=null||s[k]!=null)return {w:s.w,r:s[k]};if(s.tw!=null||s.tr!=null)return {w:s.tw,r:s.tr}}
+  const l=pv&&pv.sets[pv.sets.length-1];return l?{w:l.w,r:l[k]}:{w:null,r:null}}
+
+function history(){const fs=finished();if(!fs.length)return `<h1 style="font-size:30px;text-transform:uppercase">History</h1><div class="empty">Finished workouts show up here, newest first. You can open any of them to fix a number or delete it.</div>`;
+  const nS=fs.filter(w=>w.source==='strong').length;
+  let h=`<h1 style="font-size:30px;text-transform:uppercase">History</h1><div class="muted" style="font-size:14px">${fs.length} workouts · ${nS} from Strong${S.strongMeta?`, imported ${esc(fmtShort(S.strongMeta.importedAt))}`:''}</div>`;let mo='';
+  fs.slice(0,S.histN).forEach(w=>{const m=new Date(w.startedAt).toLocaleDateString(undefined,{month:'long',year:'numeric'});if(m!==mo){mo=m;h+=`<div class="month">${esc(m)}</div>`}
+    const dur=w.endedAt?fmtMin(new Date(w.endedAt)-new Date(w.startedAt)):'';const k='del'+w.id;
+    h+=`<article class="hcard"><div class="row split"><span class="hdate">${esc(fmtDate(w.startedAt))}${dur?' · '+dur:''} · ${fmtVol(workVol(w))} lb</span>${w.source==='strong'?'<span class="src">Strong</span>':'<span class="src mine">Lift Log</span>'}</div>
+    <h3 class="hname">${esc(w.name)}</h3><div class="hlines">${(w.exercises||[]).map(x=>{const b=bestSet(x.sets);return `<div class="hline"><span>${esc(x.name)}</span><span>${x.sets.filter(s=>s.done).length} sets${b?' · top '+setTxt(b):''}</span></div>`}).join('')}</div>
+    ${w.notes?`<div class="muted" style="font-size:14px">${esc(w.notes)}</div>`:''}
+    ${w.source==='strong'?'<div class="muted" style="font-size:13px">Edit this one in Strong; it refreshes when you import your next export from the Data tab.</div>':`<div class="row"><button class="btn small" data-act="edit" data-id="${w.id}">Edit</button><button class="btn small ${S.confirm===k?'warn':'ghost'}" data-act="del" data-id="${w.id}">${S.confirm===k?'Delete for good?':'Delete'}</button></div>`}</article>`});
+  if(fs.length>S.histN)h+=`<button class="btn block" data-act="more">Show ${Math.min(30,fs.length-S.histN)} more</button>`;
+  return h}
+
+function progress(){const names=[...exNames().entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  let h=`<h1 style="font-size:30px;text-transform:uppercase">Progress</h1>`;
+  if(!names.length)return h+`<div class="empty">Once you finish a workout, each exercise gets a chart here: estimated one-rep max over time, your heaviest set, and personal records.</div>`;
+  if(!S.prog||!names.includes(S.prog))S.prog=names[0];
+  const cnt=exNames();h+=`<select class="search" id="progsel" aria-label="Exercise">${names.map(n=>`<option value="${esc(n)}"${n===S.prog?' selected':''}>${esc(n)} (${cnt.get(n)})</option>`).join('')}</select>
+  <div class="chips">${[['3m','3 mo'],['1y','1 yr'],['all','All time']].map(([k,l])=>`<button class="chip${S.range===k?' on':''}" data-act="range" data-v="${k}">${l}</button>`).join('')}</div>`;
+  let ses=finished().slice().reverse().map(w=>{const x=(w.exercises||[]).find(e=>e.name===S.prog);if(!x)return null;const d=x.sets.filter(s=>s.done);if(!d.length)return null;
+    const b=bestSet(d);if(!b)return null;return {t:new Date(w.startedAt).getTime(),date:w.startedAt,best:b,e:b.e,top:Math.max(...d.map(s=>s.w||0)),reps:d.reduce((a,s)=>a+(s.r||s.sec||0),0),vol:d.reduce((a,s)=>a+(s.w||0)*(s.r||0),0),n:d.length}}).filter(Boolean);
+  const allSes=ses;const cut={'3m':91,'1y':365}[S.range];const inR=cut?allSes.filter(s=>s.t>=Date.now()-cut*864e5):allSes;
+  if(!allSes.length)return h+`<div class="empty">No completed sets of ${esc(S.prog)} yet.</div>`;
+  if(!inR.length)return h+`<div class="empty">No ${esc(S.prog)} in this range. Last logged ${esc(fmtDate(allSes[allSes.length-1].date))}; try All time.</div>`;
+  ses=inR;
+  const weighted=ses.some(s=>s.e>0);const val=s=>weighted?s.e:s.reps;const label=weighted?'Est. 1-rep max (lb)':'Total reps or seconds';
+  let pr=-1,prs=new Set();ses.forEach((s,i)=>{if(val(s)>pr){pr=val(s);prs.add(i)}});
+  const bestE=Math.max(...ses.map(val));const heavy=Math.max(...ses.map(s=>s.top));
+  h+=`<div class="stats"><div class="stat"><b class="num">${Math.round(bestE)}</b><span>${weighted?'best est. 1RM':'most reps'}</span></div><div class="stat"><b class="num">${weighted?fw(heavy):ses.length}</b><span>${weighted?'heaviest lb':'sessions'}</span></div><div class="stat"><b class="num">${ses.length}</b><span>sessions</span></div></div>`;
+  h+=`<section class="panel"><div class="eyebrow">${label}</div>${chart(ses.map(s=>({t:s.t,y:val(s)})))}</section>`;
+  h+=`<section class="panel"><div class="eyebrow">Sessions</div><div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Date</th><th>Best set</th><th>${weighted?'e1RM':'Reps'}</th><th>Volume</th></tr></thead><tbody>
+  ${ses.map((s,i)=>({s,i})).reverse().slice(0,25).map(({s,i})=>`<tr><td>${esc(fmtShort(s.date))}${prs.has(i)&&i>0?'<span class="pr">PR</span>':''}</td><td>${setTxt(s.best)}</td><td>${Math.round(val(s))}</td><td>${fmtVol(s.vol)}</td></tr>`).join('')}</tbody></table></div></section>`;
+  return h}
+
+function dataView(){const m=S.strongMeta;const mine=[...S.remote.values()].filter(w=>w.finished).length;
+  const yd=iso=>new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  let h=`<h1 style="font-size:30px;text-transform:uppercase">Data</h1>`;
+  h+=`<section class="panel"><div class="eyebrow">Strong history</div>
+  <div>${m?`<b class="num">${m.workouts}</b> workouts, ${esc(yd(m.first))} to ${esc(yd(m.last))}`:'Not imported yet.'}</div>
+  <div class="muted" style="font-size:14px">${m?'Imported '+esc(yd(m.importedAt))+'. ':''}In Strong, go to Settings → Export Strong Data, save the CSV to Files, then pick it here. A new import replaces your Strong history and never touches workouts you logged in Lift Log.</div>
+  <label class="btn block" for="csvIn" style="text-align:center">Import Strong export (.csv)</label><input type="file" id="csvIn" class="vh" accept=".csv,text/csv,text/comma-separated-values"></section>`;
+  h+=`<section class="panel"><div class="eyebrow">Google Sheets sync</div>`;
+  if(!SY.url)h+=`<div class="muted" style="font-size:14px">Sends every finished workout, your Strong history and your templates to a Google Sheet that Claude can read. Logging still works offline; it syncs when you're back online.</div>
+    <input class="search" id="sheetUrl" type="url" autocomplete="off" placeholder="Paste your Apps Script web app URL"><button class="btn primary" data-act="sheetconnect">Connect sheet</button>`;
+  else{const st=syncing?'Syncing…':SY.err?'Not synced':SY.last?'Synced '+ago(SY.last):'Waiting to sync';const pc=pendingCount();
+    h+=`<div class="hline"><span>Status</span><span>${esc(st)}</span></div><div class="hline"><span>Waiting to send</span><span>${pc?pc+' workout'+(pc>1?'s':''):'Nothing'}${SY.strong?' + Strong history':''}</span></div>
+    ${SY.err?`<div class="banner">${esc(SY.err)}</div>`:''}
+    <div class="row"><button class="btn" data-act="syncnow" style="flex:1">Sync now</button><button class="btn ${S.confirm==='sheetdisc'?'warn':'ghost'}" data-act="sheetdisc">${S.confirm==='sheetdisc'?'Disconnect?':'Disconnect'}</button></div>`}
+  h+=`</section>`;
+  h+=`<section class="panel"><div class="eyebrow">Backup</div>
+  <div>Everything lives on this phone: <b class="num">${mine}</b> workouts logged in Lift Log, ${S.templates.length} templates, and your Strong history.</div>
+  <div class="muted" style="font-size:14px">Deleting the home-screen icon deletes this data, so export a backup every week or two and keep it in Files or iCloud Drive.</div>`;
+  if(S.restore){const r=S.restore;h+=`<div class="banner">Restore <b>${Object.keys(r.workouts||{}).length}</b> logged workouts${r.strong?` and ${r.strong.workouts?r.strong.workouts.length:0} Strong workouts`:''} from ${esc(yd(r.exportedAt))}? This replaces what's on this phone.</div>
+    <div class="row"><button class="btn primary" data-act="restoreyes">Restore</button><button class="btn ghost" data-act="restoreno">Cancel</button></div>`}
+  h+=`<div class="row"><button class="btn" data-act="export" style="flex:1">Export backup</button><label class="btn" for="bakIn" style="flex:1;text-align:center">Restore backup</label></div><input type="file" id="bakIn" class="vh" accept=".json,application/json"></section>`;
+  h+=`<section class="panel"><div class="eyebrow">App</div><div class="hline"><span>Version</span><span class="num">${APP_VERSION}</span></div>
+  <div class="hline"><span>Storage</span><span>${S.persisted?'Protected from cleanup':'Standard'}</span></div>
+  <button class="btn" data-act="checkupd">Check for updates</button></section>`;
+  return h}
+
+function nice(lo,hi){if(hi<=lo){hi=lo+1;lo=Math.max(0,lo-1)}const raw=(hi-lo)/4;const p=Math.pow(10,Math.floor(Math.log10(raw)));const st=[1,2,2.5,5,10].map(m=>m*p).find(s=>s>=raw);
+  const a=Math.floor(lo/st)*st,b=Math.ceil(hi/st)*st;const t=[];for(let v=a;v<=b+1e-9;v+=st)t.push(Math.round(v*100)/100);return {a,b,t}}
+function chart(pts){const W=340,H=190,L=38,R=16,T=14,B=26;const pw=W-L-R,ph=H-T-B;
+  const ys=pts.map(p=>p.y);const {a,b,t}=nice(Math.min(...ys)*0.97,Math.max(...ys)*1.02);
+  const t0=pts[0].t,t1=pts[pts.length-1].t;const X=v=>pts.length===1||t1===t0?L+pw/2:L+(v-t0)/(t1-t0)*pw;const Y=v=>T+ph-(v-a)/(b-a)*ph;
+  let s=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Chart">`;
+  t.forEach(v=>{s+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${v}</text>`});
+  const line=pts.map(p=>`${X(p.t).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
+  if(pts.length>1)s+=`<polygon points="${X(t0)},${T+ph} ${line} ${X(t1)},${T+ph}" fill="var(--accent)" fill-opacity="0.12"/><polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  pts.forEach((p,i)=>{const last=i===pts.length-1;s+=`<circle cx="${X(p.t)}" cy="${Y(p.y)}" r="${last?5:3}" fill="${last?'var(--accent)':'var(--surface)'}" stroke="var(--accent)" stroke-width="2"/>`});
+  const lp=pts[pts.length-1];const lx=X(lp.t);s+=`<text class="end" x="${Math.min(lx,W-R)}" y="${Math.max(Y(lp.y)-10,T+10)}" text-anchor="${lx>W-60?'end':'middle'}">${Math.round(lp.y)}</text>`;
+  s+=`<text x="${X(t0)}" y="${H-6}" text-anchor="${pts.length===1?'middle':'start'}">${esc(fmtShort(new Date(t0)))}</text>`;
+  if(pts.length>1)s+=`<text x="${X(t1)}" y="${H-6}" text-anchor="end">${esc(fmtShort(new Date(t1)))}</text>`;
+  return s+'</svg>'}
+
+function renderSheet(){const w=$('sheetWrap');if(!S.picker){w.innerHTML='';return}
+  if(!w.innerHTML){w.innerHTML=`<div class="scrim" data-act="closepicker"></div><div class="sheet" role="dialog" aria-label="Add exercise"><div class="row split"><h2 style="font-size:24px;text-transform:uppercase">Add exercise</h2><button class="btn small ghost" data-act="closepicker">Close</button></div>
+  <input class="search" id="q" placeholder="Search or type a new exercise" autocomplete="off" value="${esc(S.q)}"><div class="plist" id="plist"></div></div>`;
+  setTimeout(()=>{const q=$('q');if(q)q.focus()},30)}
+  renderPickList()}
+function renderPickList(){const el=$('plist');if(!el)return;const used=exNames();const q=S.q.trim().toLowerCase();
+  const names=[...new Set([...[...used.keys()].sort((a,b)=>used.get(b)-used.get(a)),...LIB])].filter(n=>!q||n.toLowerCase().includes(q));
+  const cur=getW(activeId());const inW=new Set((cur&&cur.exercises||[]).map(x=>x.name));
+  let h='';if(q&&!names.some(n=>n.toLowerCase()===q))h+=`<button class="pitem" data-act="pick" data-v="${esc(S.q.trim())}"><span>Add “${esc(S.q.trim())}”</span><small>new exercise</small></button>`;
+  h+=names.map(n=>`<button class="pitem" data-act="pick" data-v="${esc(n)}"><span>${esc(n)}</span><small>${inW.has(n)?'in this workout':used.get(n)?used.get(n)+'× logged':''}</small></button>`).join('');
+  el.innerHTML=h||'<div class="muted" style="padding:12px 4px">No matches.</div>'}
+
+/* ---------- rest timer ---------- */
+function startRest(sec){rest.cur=sec||rest.len;rest.until=Date.now()+rest.cur*1000;rest.doneAt=0;clearInterval(rest.timer);rest.timer=setInterval(restTick,500);renderRest()}
+function stopRest(){rest.until=0;rest.doneAt=0;clearInterval(rest.timer);renderRest()}
+function restTick(){const left=rest.until-Date.now();if(left<=0&&!rest.doneAt){rest.doneAt=Date.now();try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}renderRest();return}
+  if(rest.doneAt&&Date.now()-rest.doneAt>4000){stopRest();return}updRest()}
+function renderRest(){const w=$('restWrap');if(!rest.until||S.tab!=='workout'){w.innerHTML='';return}
+  w.innerHTML=`<div class="rest${rest.doneAt?' over':''}" role="timer"><div class="bar" id="rbar"></div><span class="t num" id="rt"></span><span class="lbl">${rest.doneAt?'Rest done · next set':'Rest'}</span>
+  ${rest.doneAt?'':`<button data-act="rest" data-v="-15">−15</button><button data-act="rest" data-v="15">+15</button>`}<button data-act="rest" data-v="0">${rest.doneAt?'OK':'Skip'}</button></div>`;updRest()}
+function updRest(){const t=$('rt'),b=$('rbar');if(!t)return;const left=Math.max(0,rest.until-Date.now());t.textContent=fmtDur(Math.ceil(left/1000)*1000);if(b)b.style.width=(rest.doneAt?0:Math.min(100,left/((rest.cur||rest.len)*1000)*100))+'%'}
+
+/* ---------- live elapsed + wake lock ---------- */
+function tick(){document.querySelectorAll('[data-elapsed]').forEach(el=>{const w=getW(el.dataset.elapsed);if(w&&!w.finished)el.textContent=fmtDur(Date.now()-new Date(w.startedAt))})}
+setInterval(tick,1000);
+let lock=null;async function wake(){try{if(activeId()&&!S.editId&&document.visibilityState==='visible'&&!lock&&navigator.wakeLock){lock=await navigator.wakeLock.request('screen');lock.addEventListener('release',()=>{lock=null})}}catch(e){lock=null}}
+document.addEventListener('visibilitychange',wake);
+
+/* ---------- events ---------- */
+main.addEventListener('input',e=>{const t=e.target,f=t.dataset.f;if(!f)return;const id=t.dataset.w;const d=ensureDraft(id).data;
+  if(f==='name')d.name=t.value;else if(f==='notes')d.notes=t.value;
+  else{const x=d.exercises[+t.dataset.e],s=x.sets[+t.dataset.s];if(f==='w')s.w=num(t.value);else{const k=uk(x),r=num(t.value);s[k]=r==null?null:(k==='r'?Math.round(r):r)}}
+  touch(id);const ms=$('mset'),mv=$('mvol');if(ms)ms.textContent=doneCount(d);if(mv)mv.textContent=fmtVol(workVol(d))});
+main.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.classList.contains('cell')){e.preventDefault();e.target.blur()}});
+document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;renderPickList()}});
+document.addEventListener('change',async e=>{const t=e.target;if(t.id==='progsel'){S.prog=t.value;render();return}
+  if(t.id==='csvIn'||t.id==='bakIn'){const f=t.files&&t.files[0];t.value='';if(!f)return;let text;try{text=await f.text()}catch(err){flash('Couldn’t read that file.');return}
+    try{if(t.id==='csvIn'){const st=strongFromCSV(text,f.name);if(!lsWrite(K.s,st))throw new Error('Not enough storage on this phone for that import.');applyStrong(st);if(SY.url){SY.strong=true;saveSY();schedSync(1000)}render();flash(`Imported ${st.meta.workouts} Strong workouts.`)}
+      else{S.restore=readBackup(text);render()}}catch(err){flash(err.message||'Import failed.')}}});
+document.addEventListener('keydown',e=>{if(e.target.id==='q'&&e.key==='Enter'){const f=document.querySelector('#plist .pitem');if(f)f.click()}if(e.key==='Escape'&&S.picker){S.picker=false;renderSheet()}});
+
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act;const prevConfirm=S.confirm;S.confirm=null;
+  const id=activeId();const d=id?ensureDraft(id).data:null;
+  switch(act){
+    case 'tab':S.tab=b.dataset.v;if(S.tab!=='workout')S.picker=false;render();window.scrollTo(0,0);break;
+    case 'start':{const nid=uid();const now=new Date();drafts.set(nid,{data:{name:DAYS[now.getDay()]+' Lift',startedAt:now.toISOString(),finished:false,exercises:[],notes:'',updatedAt:now.toISOString()},dirty:true,inflight:false,timer:null});touch(nid,true);S.picker=true;S.q='';render();wake();break}
+    case 'tpl':{const t=S.templates.find(x=>x.id===b.dataset.id);if(!t)break;const nid=uid();const now=new Date();
+      const exs=(t.exercises||[]).map(x=>({name:x.name,unit:x.unit,rest:x.rest,note:x.note,sets:(x.sets||[]).map(q=>({w:null,r:null,done:false,...(q.t?{t:q.t}:{}),tw:q.w??null,tr:q.r??null}))}));
+      drafts.set(nid,{data:{name:t.name,template:t.id,plan:t.note||'',startedAt:now.toISOString(),finished:false,exercises:exs,notes:'',updatedAt:now.toISOString()},dirty:true,inflight:false,timer:null});
+      touch(nid,true);render();window.scrollTo(0,0);wake();break}
+    case 'picker':S.picker=true;S.q='';render();break;
+    case 'closepicker':S.picker=false;renderSheet();break;
+    case 'pick':{if(!d)break;const name=b.dataset.v;const pv=prevSets(name,id);const n=pv?Math.max(1,Math.min(pv.sets.length,8)):3;
+      d.exercises.push({name,sets:Array.from({length:n},()=>({w:null,r:null,done:false}))});touch(id);S.picker=false;render();
+      const el=$('ex-'+(d.exercises.length-1));if(el)el.scrollIntoView({block:'start',behavior:'smooth'});break}
+    case 'addset':{const x=d.exercises[+b.dataset.e];x.sets.push({w:null,r:null,done:false});touch(id);render();break}
+    case 'rmset':{const x=d.exercises[+b.dataset.e];if(x.sets.length>1)x.sets.pop();touch(id);render();break}
+    case 'rmex':{const k='rmex'+b.dataset.e;if(prevConfirm!==k){S.confirm=k;render();break}d.exercises.splice(+b.dataset.e,1);touch(id);render();break}
+    case 'chk':{const ei=+b.dataset.e,si=+b.dataset.s;const x=d.exercises[ei],s=x.sets[si];
+      if(!s.done){const ph=hint(x,si,prevSets(x.name,id));const k=uk(x);if(s.w==null&&ph.w!=null)s.w=ph.w;if(s[k]==null&&ph.r!=null)s[k]=ph.r;
+        if(s[k]==null){render();const r=$('r-'+ei+'-'+si);if(r)r.focus();break}s.done=true;if(!d.finished)startRest(x.rest)}
+      else s.done=false;touch(id);render();break}
+    case 'finish':{const unchecked=d.exercises.reduce((a,x)=>a+x.sets.filter(s=>!s.done).length,0);
+      if(unchecked&&prevConfirm!=='finish'){S.confirm='finish';render();break}
+      d.exercises=d.exercises.map(x=>({...x,sets:x.sets.filter(s=>s.done)})).filter(x=>x.sets.length);d.finished=true;d.endedAt=new Date().toISOString();
+      touch(id,true);stopRest();try{lock&&lock.release()}catch(e){}S.tab='history';render();window.scrollTo(0,0);break}
+    case 'discard':{if(prevConfirm!=='discard'){S.confirm='discard';render();break}stopRest();removeW(id);break}
+    case 'doneedit':{if(drafts.get(id))touch(id,true);S.editId=null;S.tab='history';render();break}
+    case 'delcur':{if(prevConfirm!=='delcur'){S.confirm='delcur';render();break}S.editId=null;S.tab='history';removeW(id);break}
+    case 'edit':S.editId=b.dataset.id;S.tab='workout';render();window.scrollTo(0,0);break;
+    case 'del':{const k='del'+b.dataset.id;if(prevConfirm!==k){S.confirm=k;render();break}removeW(b.dataset.id);break}
+    case 'range':S.range=b.dataset.v;render();break;
+    case 'export':exportBackup();break;
+    case 'sheetconnect':{const u=$('sheetUrl');connectSheet(u&&u.value);break}
+    case 'syncnow':syncNow(true);break;
+    case 'sheetdisc':{if(prevConfirm!=='sheetdisc'){S.confirm='sheetdisc';render();break}SY={url:'',token:'',pend:[],dels:[],strong:false,last:null,err:''};saveSY();render();flash('Disconnected. Your sheet keeps what was already synced.');break}
+    case 'restoreno':S.restore=null;render();break;
+    case 'restoreyes':{try{restoreBackup(S.restore);S.restore=null;render();flash('Backup restored.')}catch(err){S.restore=null;render();flash(err.message)}break}
+    case 'checkupd':{const reg=window.__llReg;if(!reg){flash('Updates work once Lift Log is installed from your site.');break}
+      flash('Checking…');reg.update().then(()=>{if(!reg.installing&&!reg.waiting)flash('You’re on the latest version.')}).catch(()=>flash('Couldn’t check. Are you online?'));break}
+    case 'more':S.histN+=30;render();break;
+    case 'rest':{const v=+b.dataset.v;if(!v){stopRest();break}rest.cur=Math.max(15,(rest.cur||rest.len)+v);if(!(d&&d.exercises&&d.exercises.some(x=>x.rest))){rest.len=rest.cur;lsSet('ll.rest',rest.len)}rest.until+=v*1000;updRest();break}
+  }
+  if(prevConfirm&&!S.confirm&&!['rmex','finish','discard','delcur','del','sheetdisc'].includes(act))render();
+});
+async function removeW(id){const d=drafts.get(id);if(d)clearTimeout(d.timer);drafts.delete(id);S.remote.delete(id);render();
+  try{await store.del(id);setSave('saved')}catch(e){setSave('error','Couldn’t delete that workout. Your phone may be out of storage.')}}
+
+render();connect().then(()=>{wake()});
+})();
+</script>
+<script>
+/* PWA bridge: manifest link, service worker registration, and the update toast */
+(function(){
+  if(!document.querySelector('link[rel="manifest"]')){var l=document.createElement('link');l.rel='manifest';l.href='./manifest.json';document.head.appendChild(l)}
+  if(!('serviceWorker' in navigator))return;
+  var reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',function(){if(reloading)return;reloading=true;window.location.reload()});
+  function showUpdate(reg){
+    if(document.getElementById('updToast'))return;
+    var t=document.createElement('div');t.id='updToast';t.className='toast';t.setAttribute('role','status');
+    t.innerHTML='<span>New features available!</span><button type="button">Tap to Update</button>';
+    t.querySelector('button').addEventListener('click',function(){
+      this.textContent='Updating…';this.disabled=true;
+      try{window.__llFlush&&window.__llFlush()}catch(e){}
+      if(reg.waiting){reg.waiting.postMessage({type:'SKIP_WAITING'})}else{window.location.reload()}
+    });
+    document.body.appendChild(t);
+  }
+  function watch(reg){
+    if(reg.waiting&&navigator.serviceWorker.controller)showUpdate(reg);
+    reg.addEventListener('updatefound',function(){var nw=reg.installing;if(!nw)return;
+      nw.addEventListener('statechange',function(){if(nw.state==='installed'&&navigator.serviceWorker.controller)showUpdate(reg)})});
+  }
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).then(function(reg){
+      window.__llReg=reg;watch(reg);
+      function check(){if(navigator.onLine!==false)reg.update().catch(function(){})}
+      setInterval(check,30*60*1000);
+      document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')check()});
+      window.addEventListener('online',check);
+    }).catch(function(){});
+  });
+})();
+</script>
+</body>
+</html>
