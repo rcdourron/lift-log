@@ -1,3 +1,4 @@
+/** @OnlyCurrentDoc */
 /**
  * Lift Log → Google Sheets sync.
  *
