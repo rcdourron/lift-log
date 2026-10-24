@@ -19,6 +19,8 @@ A free, offline-first lifting tracker you install on your phone's home screen. N
 - **Rest timer** that starts when you check off a set, using each exercise's own rest time, with a beep (toggle on the Data tab) and auto-scroll to the next set.
 - **Plate math** for any bar: pick the bar per exercise in its ••• menu (45 lb by default for barbell lifts, 55 for trap bar, plates only for landmine).
 - **How-to diagrams (online only).** An exercise's history sheet shows images, a muscle map and a description from the open [wger](https://wger.de) exercise database when it has a match, plus a link to form videos.
+- **Adjust a workout mid-session with Claude.** Tap **Adjust with Claude**, say what's going on ("back feels tight", "hotel gym, dumbbells only"). Lift Log copies a prompt with what you've done and what's left and opens Claude. Copy Claude's reply back, preview the changes and apply them. Finished sets are never touched, and there's an Undo.
+- **Swap exercise** from any exercise's ••• menu, with similar movements listed first. Reps carry over, finished sets stay.
 - **Body weight log** with a trend line, synced to the sheet.
 - **Ask Claude.** Opens Claude with a ready-made prompt (weekly check-in, plan the next session, review a workout). Paste a Claude Project link on the Data tab to send prompts there instead, so conversations and plans stay in one place.
 - **Timed and distance sets** (planks, wall sits, carries) alongside regular reps.

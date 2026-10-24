@@ -37,6 +37,7 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 | `ll.body` | Body-weight log `[{date: 'YYYY-MM-DD', lb}]`, sorted. |
 | `ll.bars` | Per-exercise bar weight for plate math `{ [exerciseName]: lb | 0 (plates only) | null (none) }`. Defaults in `barFor()`. |
 | `ll.intdone` | Interval session ticked off, keyed by the Monday of the week. |
+| `ll.undo` | Snapshot `{id, exercises, plan, at}` taken before the last Claude adjustment or swap, for Undo. Cleared on finish. |
 | `ll.howto` | Cache of wger lookups `{ [exerciseName]: {status, data} }`. Delete to retry misses. |
 
 ## Data model
@@ -136,6 +137,23 @@ Script Properties used: `TOKEN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `ST
 - **wger.de** (`loadHowto()`): `GET /api/v2/exercise-translation/?language=2&name=…` (exact, case-sensitive match) then `/api/v2/exerciseinfo/{id}/`. Strong names like `Squat (Barbell)` are tried as an alias from `HOW_ALIAS`, then the full name, then the name without the equipment suffix and plural forms. Images are CC-BY-SA and similar — keep the attribution line. Add aliases to `HOW_ALIAS` when an exercise doesn't match.
 - **Claude:** "Ask Claude" opens `https://claude.ai/new?q=<prompt>` (prompt capped at 1800 chars, and it contains no workout numbers — Claude reads them from the sheet). If the user saved a project link in `ll.cfg.claudeUrl`, the prompt is copied to the clipboard and the project opens instead.
 - The service worker only caches same-origin files and Google Fonts; these requests go straight to the network.
+
+## Live adjustments (Claude change blocks)
+
+"Adjust with Claude" copies `livePrompt()` (the in-progress workout as numbered exercises with done/left sets) to the clipboard and opens Claude. Claude answers with a block the user pastes back; `parseChanges()` reads it and `planChanges()` turns it into a new exercise list for preview:
+
+```
+LIFTLOG-CHANGES
+{"changes":[
+  {"op":"swap",   "ex":1, "to":"Goblet Squat (Dumbbell)", "sets":[{"w":50,"r":10}], "unit":"sec|m (optional)", "rest":90, "note":"…"},
+  {"op":"sets",   "ex":2, "sets":[{"w":135,"r":8}]},      // replaces the sets not yet done
+  {"op":"remove", "ex":3},                                 // drops remaining sets; removes the exercise if none were done
+  {"op":"add",    "after":4, "name":"Dead Bug", "sets":[{"r":10}], "rest":60},   // after:0 = first, omitted = last
+  {"op":"note",   "text":"…"}                              // appended to the workout plan note
+]}
+```
+
+`ex`/`after` are 1-based numbers from the prompt, resolved before anything moves. Done sets are never changed; swapping an exercise with done sets keeps it (done sets only) and inserts the new one after it. New sets become targets (`tw`/`tr`), so the user still confirms each one. Changed exercises get `adj: 1`, which turns off smart-progression suggestions for them. The menu's **Swap exercise** uses the same code (`op: swap` without `sets`: reps carry over, weights clear). `altsFor()` lists similar movements using the `ALT` pattern groups.
 
 ## Testing changes
 

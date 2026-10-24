@@ -274,6 +274,8 @@ textarea.notes{width:100%;min-height:70px;border:1px solid var(--line);backgroun
 .attr{font-size:11px;color:var(--muted)}
 .attr a{color:inherit}
 .spark{width:100%;height:60px;display:block}
+.chg{display:flex;flex-direction:column;gap:6px;font-size:14px}.chg div{background:var(--sunk);border-radius:8px;padding:8px 10px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
 .inrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .inrow input{flex:1;min-width:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
@@ -321,7 +323,7 @@ const fmtMin=ms=>{const m=Math.round(ms/60000);return m>=60?`${Math.floor(m/60)}
 const fmtVol=v=>v>=10000?(Math.round(v/100)/10)+'k':Math.round(v).toLocaleString();
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
-const S={remote:new Map(),loaded:false,tab:'workout',editId:null,picker:false,q:'',confirm:null,prog:null,range:'1y',histN:30,strong:new Map(),strongMeta:null,templates:[],cardio:[],strava:null,tplEdit:null,hfilter:'all',goal:lsGet('ll.goal',{lifts:2,cardio:2}),block:lsGet('ll.block',{name:'Fall 26',start:null,weeks:8,trips:[]}),cfg:lsGet('ll.cfg',{sound:true,easyPace:'10:20',runBase:35,runMax:50,intBase:6,intMax:10,claudeUrl:''}),checkins:lsGet('ll.checkins',{}),body:lsGet('ll.body',[]),bars:lsGet('ll.bars',{}),intDone:lsGet('ll.intdone',{}),howto:{},mode:'connecting',saveState:'',banner:''};
+const S={remote:new Map(),loaded:false,tab:'workout',editId:null,picker:false,q:'',confirm:null,prog:null,range:'1y',histN:30,strong:new Map(),strongMeta:null,templates:[],cardio:[],strava:null,tplEdit:null,hfilter:'all',goal:lsGet('ll.goal',{lifts:2,cardio:2}),block:lsGet('ll.block',{name:'Fall 26',start:null,weeks:8,trips:[]}),cfg:lsGet('ll.cfg',{sound:true,easyPace:'10:20',runBase:35,runMax:50,intBase:6,intMax:10,claudeUrl:''}),checkins:lsGet('ll.checkins',{}),undo:lsGet('ll.undo',null),swap:null,body:lsGet('ll.body',[]),bars:lsGet('ll.bars',{}),intDone:lsGet('ll.intdone',{}),howto:{},mode:'connecting',saveState:'',banner:''};
 const drafts=new Map();
 let store=null, pendingRender=false;
 let rest={until:0,len:lsGet('ll.rest',120),timer:null,doneAt:0};
@@ -349,7 +351,7 @@ function onRemote(entries){S.remote=new Map(entries);S.loaded=true;const cur=act
     if(id!==cur&&(r.updatedAt||'')>=(d.data.updatedAt||''))drafts.delete(id)}
   if(S.saveState==='')setSave('');renderSoon()}
 
-const APP_VERSION='2026-10-24.5';
+const APP_VERSION='2026-10-24.6';
 const K={w:'ll.workouts.v1',s:'ll.strong.v1',t:'ll.templates.v1',c:'ll.cardio.v1',sv:'ll.strava.v1'};
 function lsRead(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
 function lsWrite(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
@@ -559,7 +561,7 @@ function weekStrip(){const now=new Date();const mon=new Date(now);mon.setHours(0
 
 /* ---------- progression ---------- */
 const BIGSTEP=/Squat|Deadlift|Leg Press|Hip Thrust|Trap Bar|Lunge \(Barbell\)/i;
-function suggestFor(x,pv){if(!pv||uk(x)!=='r')return null;
+function suggestFor(x,pv){if(!pv||uk(x)!=='r'||x.adj)return null;
   if(recentWorse()){const ws=pv.sets.filter(q=>q.t!=='W'&&q.w>0);if(!ws.length)return null;const top=Math.max(...ws.map(q=>q.w));return {w:Math.max(5,round5(top*0.9)),up:false,down:true,why:'you felt worse after your last session'}}const work=pv.sets.filter(q=>q.t!=='W'&&q.w>0&&q.r>0);if(!work.length)return null;
   const top=Math.max(...work.map(q=>q.w));const tops=work.filter(q=>q.w===top);
   const targets=x.sets.filter(q=>!q.t&&q.tr!=null).map(q=>q.tr);const target=targets.length?Math.max(...targets):null;
@@ -634,6 +636,75 @@ function howHtml(d){const all=[...d.main,...d.sec];const sides=[['front',true],[
   ${d.desc?`<div class="muted" style="font-size:14px">${esc(d.desc)}</div>`:''}
   <div class="attr">Diagram and images: <a href="https://wger.de/en/exercise/${d.id}/view/" target="_blank" rel="noopener">wger.de</a>${d.imgs[0]&&d.imgs[0].lic?' · '+esc(d.imgs[0].lic):''}${d.imgs[0]&&d.imgs[0].author?' · '+esc(d.imgs[0].author):''}. Matched as “${esc(d.name)}”.</div>`}
 
+/* ---------- live adjustments (Claude change blocks, swaps) ---------- */
+const ALT=[[/squat|leg press|lunge|step up|hack/i],[/deadlift|rdl|hip thrust|good morning|swing|glute bridge|back extension|pull through/i],
+  [/bench press|push up|chest press|dip|fly|flye/i],[/overhead press|shoulder press|arnold|landmine press|military|pike/i],[/row/i,/upright/i],
+  [/pull up|chin up|pulldown|pull down|pullover/i],[/curl/i,/leg curl/i],[/tricep|pushdown|skull|kickback|close grip|overhead extension/i],
+  [/leg curl|leg extension|calf|nordic/i],[/lateral raise|face pull|rear delt|reverse fly|y raise/i],
+  [/plank|dead bug|bird dog|pallof|carry|farmer|walk|ab wheel|crunch|hollow|cat cow|leg raise|suitcase|copenhagen/i]];
+function altsFor(name){const gs=ALT.filter(([a,b])=>a.test(name)&&!(b&&b.test(name)));if(!gs.length)return [];
+  const used=exNames();const pool=[...new Set([...[...used.keys()].sort((a,b)=>used.get(b)-used.get(a)),...LIB])];
+  return pool.filter(n=>n!==name&&gs.some(([a,b])=>a.test(n)&&!(b&&b.test(n)))).slice(0,10)}
+function setTxt(w,r,k){return k==='sec'?(w?fw(w)+' lb · ':'')+fmtSecs(r):k==='dist'?(w?fw(w)+' lb · ':'')+r+' m':w?fw(w)+'×'+r:r+' reps'}
+function targetsTxt(sets,k){const t=sets.map(q=>setTxt(q.tw,q.tr,k));if(!t.length)return 'no sets';return t.every(v=>v===t[0])?t.length+' × '+t[0]:t.join(', ')}
+function livePrompt(d,why){const bi=blockInfo();const mins=Math.round((Date.now()-Date.parse(d.startedAt))/6e4);
+  const lines=(d.exercises||[]).map((x,i)=>{const k=uk(x);const pv=prevSets(x.name,activeId());
+    const done=x.sets.filter(q=>q.done),left=x.sets.map((q,si)=>({q,si})).filter(o=>!o.q.done);
+    const plan=left.map(({q,si})=>{const h=hint(x,si,pv);const w=q.w!=null?q.w:h.w,r=q[k]!=null?q[k]:h.r;return (q.t==='W'?'warm-up ':'')+(r==null?'?':setTxt(w,r,k))});
+    return `${i+1}. ${x.name}${k==='sec'?' (timed, seconds)':k==='dist'?' (distance, meters)':''}${x.ss?' [superset '+x.ss+']':''} · rest ${fmtSecs(exRest(x))}${x.note?' · note: '+x.note:''}
+   done: ${done.length?done.map(q=>(q.t==='W'?'W ':'')+prevTxt(q,k)).join(', '):'none'}
+   left: ${plan.length?plan.join(', '):'none'}`}).join('\n');
+  return `I'm in the middle of a workout in my Lift Log app and need you to adjust the rest of it.
+
+What's going on: ${why||'(see below)'}
+${bi&&!bi.pre&&!bi.done?`Block: ${bi.b.name}, week ${bi.wk} of ${bi.b.weeks} (${bi.phase.toLowerCase()}).\n`:''}
+Workout: ${d.name}, started ${mins} min ago. Weights in lb; "w×r" = weight × reps.
+${lines}
+
+You can check my Lift Log Google Sheet (Sets tab) for history if it helps. Keep the session about as long as planned unless I say otherwise.
+
+Reply with one or two sentences on what you changed and why, then exactly one code block whose first line is LIFTLOG-CHANGES followed by JSON, like:
+LIFTLOG-CHANGES
+{"changes":[
+ {"op":"swap","ex":1,"to":"Goblet Squat (Dumbbell)","sets":[{"w":50,"r":10},{"w":50,"r":10}],"note":"why"},
+ {"op":"sets","ex":2,"sets":[{"w":135,"r":8},{"w":135,"r":8}]},
+ {"op":"remove","ex":3},
+ {"op":"add","after":4,"name":"Dead Bug","sets":[{"r":10},{"r":10}],"rest":60,"note":"slow and controlled"},
+ {"op":"note","text":"Stop any set that pinches your back."}
+]}
+Rules: "ex" and "after" are the exercise numbers above ("after":0 puts it first). "sets" lists only the sets still to do and replaces the remaining ones; finished sets are kept automatically. "w" is lb (0 or leave out for bodyweight), "r" is reps, or seconds/meters for timed/distance exercises; add "unit":"sec" or "unit":"m" when adding or swapping to a timed or distance exercise. Name exercises like "Name (Equipment)". Optional "rest" is seconds. Only change what the situation needs.`}
+function parseChanges(t){t=String(t||'');const m=t.indexOf('LIFTLOG-CHANGES');const body=m>=0?t.slice(m+15):t;const a=body.indexOf('{'),b=body.lastIndexOf('}');
+  if(a<0||b<a)throw new Error("Couldn't find the change block. Copy Claude's whole reply, including the LIFTLOG-CHANGES part.");
+  let j;try{j=JSON.parse(body.slice(a,b+1))}catch(e){throw new Error("The change block isn't valid. Ask Claude to resend it as one LIFTLOG-CHANGES code block.")}
+  const ch=Array.isArray(j)?j:j.changes;if(!Array.isArray(ch)||!ch.length)throw new Error('The change block has no changes in it.');return ch}
+function normSets(arr,unit){return (Array.isArray(arr)?arr:[]).slice(0,12).map(q=>{const r=q.r??q.reps??q.sec??q.seconds??q.dist??q.m??null;const w=num(q.w??q.lb??q.weight);
+  return {w:null,r:null,done:false,...(q.t==='W'||q.warmup?{t:'W'}:{}),tw:w==null?(unit?null:0):w,tr:r==null?null:num(r)}})}
+function planChanges(d,ch){const L=(d.exercises||[]).map(x=>({x:JSON.parse(JSON.stringify(x)),gone:false,after:[]}));const head=[],tail=[],desc=[],warn=[];
+  let plan=d.plan||'';const ref=n=>{const i=Math.round(+n)-1;return L[i]||null};
+  const mk=(name,sets,c,base)=>{const x={name:String(name).trim().slice(0,80),sets,adj:1};const u=c.unit==='sec'||c.unit==='m'?c.unit:c.unit==='reps'?'reps':(base&&base.unit&&!c.sets?base.unit:undefined);if(u)x.unit=u;
+    const rs=c.rest!=null?Math.round(+c.rest):base&&base.rest;if(rs>0)x.rest=rs;if(c.note)x.note=String(c.note);return x};
+  ch.forEach((c,ci)=>{const op=String(c.op||'').toLowerCase();
+    if(op==='note'){if(c.text){plan=(plan?plan+'\n':'')+'Claude: '+c.text;desc.push('Note: '+c.text)}return}
+    if(op==='add'){const nm=c.name||c.to;if(!nm){warn.push('Change '+(ci+1)+': add without a name');return}const x=mk(nm,[],c);x.sets=normSets(c.sets,x.unit);if(!x.sets.length)x.sets=normSets([{},{},{}]);
+      const af=c.after==null?null:Math.round(+c.after);if(af===0)head.push(x);else if(af&&ref(af))ref(af).after.push(x);else tail.push(x);
+      desc.push(`Add ${x.name}: ${targetsTxt(x.sets,uk(x))}${af&&ref(af)?' after '+ref(af).x.name:af===0?' at the start':' at the end'}`);return}
+    const o=ref(c.ex??c.exercise);if(!o){warn.push('Change '+(ci+1)+': no exercise number '+(c.ex??'?'));return}if(o.gone){warn.push('Change '+(ci+1)+': '+o.x.name+' was already removed');return}
+    const x=o.x,done=x.sets.filter(q=>q.done),left=x.sets.filter(q=>!q.done);
+    if(op==='remove'){if(done.length){x.sets=done;desc.push(`${x.name}: drop the ${left.length} remaining set${left.length===1?'':'s'}`)}else{o.gone=true;desc.push('Remove '+x.name)}return}
+    if(op==='sets'||op==='edit'){const ns=normSets(c.sets,x.unit);x.sets=done.concat(ns);x.adj=1;if(c.rest>0)x.rest=Math.round(+c.rest);if(c.note)x.note=String(c.note);
+      desc.push(`${x.name}: ${ns.length?'remaining sets → '+targetsTxt(ns,uk(x)):'no more sets'}`);return}
+    if(op==='swap'){const to=c.to||c.name;if(!to){warn.push('Change '+(ci+1)+': swap without a new exercise');return}
+      const nx=mk(to,[],c,x);nx.sets=c.sets?normSets(c.sets,nx.unit):left.map(q=>({w:null,r:null,done:false,...(q.t?{t:q.t}:{}),tw:null,tr:q.tr??q[uk(x)]??null}));
+      if(!c.sets&&!nx.sets.length)nx.sets=normSets([{},{},{}]);
+      if(done.length){x.sets=done;o.after.unshift(nx)}else{if(x.ss)nx.ss=x.ss;o.x=nx}
+      desc.push(`Swap ${x.name} → ${nx.name}: ${targetsTxt(nx.sets,uk(nx))}${done.length?' (your finished sets stay)':''}`);return}
+    warn.push('Change '+(ci+1)+': unknown change "'+(c.op||'')+'"')});
+  const out=[...head];L.forEach(o=>{if(!o.gone)out.push(o.x);out.push(...o.after)});out.push(...tail);
+  const cnt={};out.forEach(x=>{if(x.ss)cnt[x.ss]=(cnt[x.ss]||0)+1});out.forEach(x=>{if(x.ss&&cnt[x.ss]<2)delete x.ss});
+  return {exercises:out,plan,desc,warn}}
+function applyPlan(id,pl,msg){const d=ensureDraft(id).data;const und={id,exercises:JSON.parse(JSON.stringify(d.exercises||[])),plan:d.plan||'',at:Date.now()};
+  d.exercises=pl.exercises;if(pl.plan!==(d.plan||''))d.plan=pl.plan;S.undo=und;lsSet('ll.undo',und);stopRest();touch(id,true);S.sheet=null;render();window.scrollTo(0,0);flash(msg)}
+
 /* ---------- ask Claude ---------- */
 function askPrompt(k){const bi=blockInfo();const blk=bi&&!bi.pre&&!bi.done?` I'm in week ${bi.wk} of ${bi.b.weeks} of my ${bi.b.name} block (${bi.phase.toLowerCase()}).`:'';
   const src='Use my Lift Log Google Sheet (Workouts, Sets, Templates and Cardio tabs) and my Strava.';
@@ -666,7 +737,9 @@ function editor(id){const w=getW(id);const past=!!w.finished;const ex=w.exercise
   <div class="wmeta2"><span>${ICAL}${esc(st.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))}</span><span>${ICLK}${past?fmtMin(new Date(w.endedAt)-st):`<span class="num" data-elapsed="${id}">${fmtDur(Date.now()-st)}</span>`}</span>
   <span><span class="num" id="mset">${doneCount(w)}</span> sets · <span class="num" id="mvol">${fmtVol(workVol(w))}</span> lb · <span id="save" class="save"></span></span></div></section>`;
   if(!past){const bi=blockInfo();if(bi&&!bi.pre&&!bi.done)h+=`<div class="banner"><b>${esc(bi.b.name)} week ${bi.wk}: ${bi.phase}.</b> ${esc(bi.note)}</div>`;if(recentWorse())h+=`<div class="banner">You said you felt worse after your last session, so today's suggested weights are about 10% lighter.</div>`}
+  if(!past&&S.undo&&S.undo.id===id)h+=`<div class="banner row split" style="align-items:center"><span>Workout adjusted.</span><button class="btn small ghost" data-act="undoadj">Undo</button></div>`;
   if(w.plan)h+=`<div class="plan">${esc(w.plan)}</div>`;
+  if(!past)h+=`<button class="btn info block" data-act="live">Adjust with Claude</button>`;
   if(!ex.length)h+=`<div class="empty">Add your first exercise. Last time's numbers show up as gray hints, so you can tap ✓ to repeat them.</div>`;
   ex.forEach((x,ei)=>{const pv=prevSets(x.name,id);const k=uk(x);const bw=k==='r'&&isBW(x,pv);const rs=exRest(x);
     const sg=past?null:suggestFor(x,pv);const prevSs=ei>0&&x.ss&&ex[ei-1].ss===x.ss;
@@ -687,7 +760,7 @@ function editor(id){const w=getW(id);const past=!!w.finished;const ex=w.exercise
       if(p)h+=`<div class="plates"><span>${bar===0?`Plates for <b class="num">${fw(top)}</b>`:`Per side for <b class="num">${fw(top)}</b> on a ${bar} lb bar`}</span><span class="pstack">${p.out.map(v=>`<i class="pl p${v===2.5?2:v}" title="${v}"></i>`).join('')}</span><span class="num">${p.out.join(' · ')}${p.rem?` (+${p.rem} unmatched)`:''}</span></div>`}
     h+=`<button class="addset" data-act="addset" data-e="${ei}">+ Add Set (${fmtSecs(rs)})</button></section>`});
   h+=`<textarea class="notes" id="notes" data-f="notes" data-w="${id}" placeholder="Workout notes">${esc(w.notes||'')}</textarea>
-  <button class="btn info block" data-act="picker">Add Exercises</button>`;
+  <button class="btn info block" data-act="picker">Add Exercises</button>${past?'':'<button class="btn info block" data-act="live">Adjust with Claude</button>'}`;
   h+=past?`<button class="btn warn block" data-act="delcur">${S.confirm==='delcur'?'Tap again to delete this workout':'Delete Workout'}</button>`
          :`<button class="btn warn block" data-act="discard">${S.confirm==='discard'?'Tap again to cancel this workout':'Cancel Workout'}</button>`;
   return h}
@@ -828,6 +901,7 @@ function sheetBody(){const sh=S.sheet;const id=activeId();const d=id?getW(id):nu
     <h3>Pinned note</h3><textarea class="notes" id="exnote" data-name="${esc(x.name)}" placeholder="Shows every time you do this exercise">${esc(EXN[x.name]||'')}</textarea>
     ${d.exercises[sh.e+1]?`<button class="btn block" data-act="ssnext">${x.ss&&d.exercises[sh.e+1].ss===x.ss?'Unlink superset with next':'Superset with next: '+esc(d.exercises[sh.e+1].name)}</button>`:''}
     <h3>Bar for plate math</h3><div class="opts">${[['none','None'],['0','Plates only'],['25','EZ 25'],['35','35'],['45','45'],['55','Trap 55'],['60','Trap 60']].map(([v,l])=>{const cur=barFor(x.name);const on=v==='none'?cur==null:cur===+v;return `<button class="opt${on?' on':''}" data-act="exbar" data-v="${v}" data-name="${esc(x.name)}">${l}</button>`}).join('')}</div>
+    <button class="btn block" data-act="swapex" data-e="${sh.e}">Swap exercise</button>
     <button class="btn block" data-act="exhist" data-v="${esc(x.name)}">History, records &amp; how-to</button>
     <button class="btn warn block" data-act="rmex" data-e="${sh.e}">${S.confirm===k?'Tap again to remove':'Remove exercise'}</button>`}
   if(sh.type==='tex'&&S.tplEdit){const L=S.tplEdit.data.exercises;const x=L[sh.e];if(!x)return head('Exercise');const rs=x.rest||rest.len;
@@ -849,6 +923,20 @@ function sheetBody(){const sh=S.sheet;const id=activeId();const d=id?getW(id):nu
     return head('Workout saved')+`<div class="rec"><div><small>Duration</small><b>${mins} min</b></div><div><small>Sets</small><b>${doneCount(w)}</b></div><div><small>Volume</small><b>${fmtVol(vol)} lb</b><small>${dv==null||!vol?'':(dv>0?'+':'')+dv+'% vs '+esc(fmtShort(prev.startedAt))}</small></div><div><small>PRs</small><b>${prs.length}</b></div></div>
     ${prs.length?`<h3>New records</h3><div class="plist">${prs.map(t=>`<div class="prow"><span>${esc(t)}</span><span class="prtag">PR</span></div>`).join('')}</div>`:''}
     <button class="btn info block" data-act="ask" data-v="workout">Ask Claude about this workout</button>`}
+  if(sh.type==='live'&&d){const st=sh.step||'ask';
+    if(st==='ask')return head('Adjust with Claude')+`<div class="muted" style="font-size:14px">Say what's going on. Lift Log copies a prompt with this workout (what's done and what's left), then opens Claude: paste it there. When Claude replies, copy its whole answer and come back here.</div>
+      <div class="chips">${['My back feels tight','Short on time: 30 min left','No barbell or rack free','Gym only has dumbbells and cables','Feeling tired today'].map(t=>`<button class="opt" data-act="livechip" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <textarea class="notes" id="liveText" style="min-height:90px" placeholder="e.g. hotel gym: dumbbells up to 50 lb, cable machine, no barbell">${esc(sh.text||'')}</textarea>
+      <button class="btn primary block" data-act="livego">Copy prompt &amp; open Claude</button>
+      ${sh.manual?`<div class="muted" style="font-size:13px">Couldn't copy automatically. Select all of this, copy it, and paste it into Claude:</div><textarea class="notes" readonly style="min-height:140px">${esc(sh.manual)}</textarea>`:''}
+      <button class="btn block" data-act="livestep" data-v="paste">I have Claude's reply →</button>`;
+    if(st==='paste')return head('Apply Claude\'s changes')+`<textarea class="notes" id="liveReply" style="min-height:130px" placeholder="Paste Claude's whole reply here">${esc(sh.reply||'')}</textarea>
+      <div class="row"><button class="btn" style="flex:1" data-act="livepaste">Paste from clipboard</button><button class="btn primary" style="flex:1" data-act="liveprev">Preview changes</button></div>
+      ${sh.err?`<div class="banner">${esc(sh.err)}</div>`:''}<button class="btn ghost block" data-act="livestep" data-v="ask">← Back</button>`;
+    if(st==='prev'&&sh.pl)return head('Preview changes')+`<div class="chg">${sh.pl.desc.map(t=>`<div>${esc(t)}</div>`).join('')||'<div>No changes.</div>'}</div>
+      ${sh.pl.warn.length?`<div class="muted" style="font-size:13px">Skipped: ${esc(sh.pl.warn.join('; '))}</div>`:''}
+      <div class="muted" style="font-size:13px">Finished sets aren't touched. You can undo this afterwards.</div>
+      <div class="row"><button class="btn" style="flex:1" data-act="livestep" data-v="paste">Back</button><button class="btn primary" style="flex:1" data-act="liveapply" ${sh.pl.desc.length?'':'disabled'}>Apply</button></div>`}
   if(sh.type==='ask'){const pre=[['week','Weekly check-in'],['next','Plan my next session'],['workout','Review my last workout'],['custom','Something else']];const k=sh.k||'week';
     return head('Ask Claude')+`<div class="muted" style="font-size:13px">Opens Claude, which can read your Lift Log sheet and Strava, so your conversation and plan are saved in Claude${S.cfg.claudeUrl?' (in your coach project)':''}.</div>
     <div class="opts">${pre.map(([v,l])=>`<button class="opt${k===v?' on':''}" data-act="askk" data-v="${v}">${l}</button>`).join('')}</div>
@@ -860,17 +948,20 @@ function sheetBody(){const sh=S.sheet;const id=activeId();const d=id?getW(id):nu
         :`<div class="muted" style="font-size:14px;text-align:center">Starts when you check off a set. Default for exercises without their own rest time:</div><div class="opts" style="justify-content:center">${[60,90,120,150,180].map(v=>`<button class="opt${rest.len===v?' on':''}" data-act="restlen" data-v="${v}">${fmtSecs(v)}</button>`).join('')}</div>`}`}
   return head('')}
 function renderSheet(){const w=$('sheetWrap');
-  if(S.picker){if(w.dataset.kind!=='picker'){w.dataset.kind='picker';w.innerHTML=`<div class="scrim" data-act="closepicker"></div><div class="sheet" role="dialog" aria-label="Add exercise"><div class="row split"><h2 style="font-size:22px">Add Exercises</h2><button class="btn small ghost" data-act="closepicker">Close</button></div>
+  if(S.picker){if(w.dataset.kind!==(S.swap!=null?'swap':'picker')){w.dataset.kind='';w.dataset.kind=S.swap!=null?'swap':'picker';w.innerHTML=`<div class="scrim" data-act="closepicker"></div><div class="sheet" role="dialog" aria-label="Add exercise"><div class="row split"><h2 style="font-size:22px">${S.swap!=null?'Swap exercise':'Add Exercises'}</h2><button class="btn small ghost" data-act="closepicker">Close</button></div>
   <input class="search" id="q" placeholder="Search or type a new exercise" autocomplete="off" value="${esc(S.q)}"><div class="plist" id="plist"></div></div>`;
   setTimeout(()=>{const q=$('q');if(q)q.focus()},30)}
   renderPickList();return}
   if(!S.sheet){w.innerHTML='';w.dataset.kind='';return}
-  if(document.activeElement&&document.activeElement.id==='exnote')return;
+  if(document.activeElement&&['exnote','liveText','liveReply','askText'].includes(document.activeElement.id))return;
   w.dataset.kind='sheet';w.innerHTML=`<div class="scrim" data-act="closesheet"></div><div class="sheet" role="dialog">${sheetBody()}</div>`;updRest()}
 function renderPickList(){const el=$('plist');if(!el)return;const used=exNames();const q=S.q.trim().toLowerCase();
   const names=[...new Set([...[...used.keys()].sort((a,b)=>used.get(b)-used.get(a)),...LIB])].filter(n=>!q||n.toLowerCase().includes(q));
   const cur=getW(activeId());const inW=new Set((cur&&cur.exercises||[]).map(x=>x.name));
-  let h='';if(q&&!names.some(n=>n.toLowerCase()===q))h+=`<button class="pitem" data-act="pick" data-v="${esc(S.q.trim())}"><span>Add “${esc(S.q.trim())}”</span><small>new exercise</small></button>`;
+  let h='';const sw=S.swap!=null&&cur&&cur.exercises[S.swap];
+  if(sw){const al=altsFor(sw.name).filter(n=>!q||n.toLowerCase().includes(q));h+=`<div class="muted" style="font-size:13px;padding:4px">Replacing <b>${esc(sw.name)}</b>. Your reps carry over; finished sets stay.</div>`;
+    if(al.length)h+=`<div class="eyebrow" style="padding:4px">Similar</div>`+al.map(n=>`<button class="pitem" data-act="pick" data-v="${esc(n)}"><span>${esc(n)}</span><small>${used.get(n)?used.get(n)+'× logged':''}</small></button>`).join('')+`<div class="eyebrow" style="padding:4px">All exercises</div>`}
+  if(q&&!names.some(n=>n.toLowerCase()===q))h+=`<button class="pitem" data-act="pick" data-v="${esc(S.q.trim())}"><span>Add “${esc(S.q.trim())}”</span><small>new exercise</small></button>`;
   h+=names.map(n=>`<button class="pitem" data-act="pick" data-v="${esc(n)}"><span>${esc(n)}</span><small>${inW.has(n)?'in this workout':used.get(n)?used.get(n)+'× logged':''}</small></button>`).join('');
   el.innerHTML=h||'<div class="muted" style="padding:12px 4px">No matches.</div>'}
 
@@ -901,6 +992,7 @@ main.addEventListener('input',e=>{const t=e.target;if(t.dataset.tf&&S.tplEdit){c
 main.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.classList.contains('cell')){e.preventDefault();e.target.blur()}});
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;renderPickList()}
   if(e.target.id==='texnote'&&S.tplEdit&&S.sheet){const x=S.tplEdit.data.exercises[S.sheet.e];if(x){if(e.target.value.trim())x.note=e.target.value;else delete x.note;S.tplEdit.dirty=true}}
+  if(S.sheet&&S.sheet.type==='live'){if(e.target.id==='liveText')S.sheet.text=e.target.value;if(e.target.id==='liveReply')S.sheet.reply=e.target.value}
   if(e.target.id==='exnote'){const n=e.target.dataset.name;const v=e.target.value.trim();if(v)EXN[n]=e.target.value;else delete EXN[n];lsSet('ll.exnotes.v1',EXN)}});
 document.addEventListener('change',async e=>{const t=e.target;if(t.id==='progsel'){S.prog=t.value;render();return}
   if(t.dataset.blk){const k=t.dataset.blk;let v=t.value;if(k==='weeks')v=Math.max(1,Math.min(26,Math.round(+v||8)));S.block={...S.block,[k]:v||(k==='start'?null:v)};lsSet('ll.block',S.block);render();return}
@@ -920,11 +1012,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
       {const bi=blockInfo();if(bi&&bi.deload)exs.forEach(x=>{const work=x.sets.filter(q=>!q.t);const keep=Math.ceil(work.length/2);let n=0;x.sets=x.sets.filter(q=>q.t||++n<=keep)})}
       drafts.set(nid,{data:{name:t.name,template:t.id,plan:t.note||'',startedAt:now.toISOString(),finished:false,exercises:exs,notes:'',updatedAt:now.toISOString()},dirty:true,inflight:false,timer:null});
       S.sheet=null;touch(nid,true);render();window.scrollTo(0,0);wake();break}
-    case 'picker':S.picker=true;S.q='';render();break;
-    case 'closepicker':S.picker=false;renderSheet();break;
+    case 'picker':S.picker=true;S.swap=null;S.q='';render();break;
+    case 'closepicker':S.picker=false;S.swap=null;renderSheet();break;
+    case 'swapex':S.sheet=null;S.picker=true;S.swap=+b.dataset.e;S.q='';render();break;
     case 'pick':{if(S.tplEdit){const name=b.dataset.v;const pv=prevSets(name,null);const work=pv?pv.sets:[];const ux={name,sets:[]};const kk=uk(ux);
         const sets=work.length?work.slice(0,8).map(q=>({w:q.w??null,r:(kk==='r'?q.r:kk==='sec'?q.sec:q.dist)??null,...(q.t==='W'?{t:'W'}:{})})):[{w:null,r:null},{w:null,r:null},{w:null,r:null}];
         S.tplEdit.data.exercises.push({name,sets});S.tplEdit.dirty=true;S.picker=false;render();const el=$('tex-'+(S.tplEdit.data.exercises.length-1));if(el)el.scrollIntoView({block:'start',behavior:'smooth'});break}
+      if(S.swap!=null&&d){const ei=S.swap;S.swap=null;S.picker=false;const pl=planChanges(d,[{op:'swap',ex:ei+1,to:b.dataset.v}]);applyPlan(id,pl,'Swapped to '+b.dataset.v+'.');const el=$('ex-'+ei);if(el)el.scrollIntoView({block:'start'});break}
       if(!d)break;const name=b.dataset.v;const pv=prevSets(name,id);const n=pv?Math.max(1,Math.min(pv.sets.length,8)):3;
       d.exercises.push({name,sets:Array.from({length:n},()=>({w:null,r:null,done:false}))});touch(id);S.picker=false;render();
       const el=$('ex-'+(d.exercises.length-1));if(el)el.scrollIntoView({block:'start',behavior:'smooth'});break}
@@ -943,7 +1037,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
     case 'finish':{const unchecked=d.exercises.reduce((a,x)=>a+x.sets.filter(s=>!s.done).length,0);
       if(unchecked&&prevConfirm!=='finish'){S.confirm='finish';render();break}
       d.exercises=d.exercises.map(x=>({...x,sets:x.sets.filter(s=>s.done)})).filter(x=>x.sets.length);d.finished=true;d.endedAt=new Date().toISOString();
-      touch(id,true);stopRest();try{lock&&lock.release()}catch(e){}S.tab='history';S.sheet={type:'sum',id};render();window.scrollTo(0,0);break}
+      touch(id,true);stopRest();S.undo=null;lsSet('ll.undo',null);try{lock&&lock.release()}catch(e){}S.tab='history';S.sheet={type:'sum',id};render();window.scrollTo(0,0);break}
     case 'discard':{if(prevConfirm!=='discard'){S.confirm='discard';render();break}stopRest();removeW(id);break}
     case 'doneedit':{if(drafts.get(id))touch(id,true);S.editId=null;S.tab='history';render();break}
     case 'delcur':{if(prevConfirm!=='delcur'){S.confirm='delcur';render();break}S.editId=null;S.tab='history';removeW(id);break}
@@ -955,6 +1049,17 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
     case 'intdone':S.intDone[b.dataset.v]=b.checked;lsSet('ll.intdone',S.intDone);break;
     case 'exbar':{const n=b.dataset.name,v=b.dataset.v;if(v==='none')S.bars[n]=null;else S.bars[n]=+v;lsSet('ll.bars',S.bars);render();break}
     case 'ask':S.sheet={type:'ask',k:b.dataset.v||'week'};renderSheet();break;
+    case 'live':S.sheet={type:'live',step:'ask'};renderSheet();break;
+    case 'livechip':{const ta=$('liveText');const v=b.dataset.v;S.sheet.text=((ta&&ta.value.trim())?ta.value.trim()+'. ':'')+v;renderSheet();break}
+    case 'livestep':{const ta=$('liveText'),rp=$('liveReply');if(ta)S.sheet.text=ta.value;if(rp)S.sheet.reply=rp.value;S.sheet.step=b.dataset.v;S.sheet.err='';renderSheet();break}
+    case 'livego':{if(!d)break;const ta=$('liveText');S.sheet.text=ta?ta.value.trim():'';const pr=livePrompt(d,S.sheet.text);let ok=false;
+      try{if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(pr).catch(()=>{S.sheet.manual=pr;S.sheet.step='ask';renderSheet()});ok=true}}catch(e){}
+      if(!ok){S.sheet.manual=pr;renderSheet();break}
+      window.open(S.cfg.claudeUrl||'https://claude.ai/new','_blank','noopener');S.sheet.step='paste';S.sheet.manual='';renderSheet();flash('Prompt copied. Paste it into Claude.');break}
+    case 'livepaste':{const sh0=S.sheet;const bad=()=>{sh0.err='Couldn\'t read the clipboard. Long-press the box above and choose Paste.';renderSheet()};try{navigator.clipboard.readText().then(t=>{if(S.sheet!==sh0)return;if(t){sh0.reply=t;sh0.err=''}else sh0.err='Clipboard is empty.';renderSheet()},bad)}catch(e){bad()}break}
+    case 'liveprev':{if(!d)break;const rp=$('liveReply');S.sheet.reply=rp?rp.value:'';try{const ch=parseChanges(S.sheet.reply);S.sheet.pl=planChanges(d,ch);S.sheet.step='prev';S.sheet.err=''}catch(e){S.sheet.err=e.message}renderSheet();break}
+    case 'liveapply':{if(!d||!S.sheet.pl)break;applyPlan(id,S.sheet.pl,"Claude's changes applied.");break}
+    case 'undoadj':{const u=S.undo;if(!u||u.id!==id||!d)break;d.exercises=u.exercises;d.plan=u.plan;S.undo=null;lsSet('ll.undo',null);touch(id,true);render();flash('Changes undone.');break}
     case 'askk':S.sheet={type:'ask',k:b.dataset.v};renderSheet();break;
     case 'askgo':{const t=($('askText')&&$('askText').value||'').trim();if(!t)break;const pu=S.cfg.claudeUrl;
       if(pu){try{navigator.clipboard&&navigator.clipboard.writeText(t)}catch(e){}window.open(pu,'_blank','noopener');flash('Prompt copied. Paste it into Claude.')}
