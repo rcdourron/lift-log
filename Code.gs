@@ -11,11 +11,12 @@
  * Strava credentials (if you connect Strava) are kept in this script's properties, never in the app.
  */
 
-const TABS = { workouts: 'Workouts', sets: 'Sets', templates: 'Templates', cardio: 'Cardio' };
+const TABS = { workouts: 'Workouts', sets: 'Sets', templates: 'Templates', cardio: 'Cardio', body: 'Body' };
 const WORKOUT_HEADER = ['id', 'date', 'name', 'source', 'template', 'minutes', 'sets', 'volume_lb', 'notes', 'updated_at', 'json'];
 const SET_HEADER = ['workout_id', 'date', 'workout', 'exercise', 'set', 'type', 'weight_lb', 'reps', 'seconds', 'distance', 'rpe', 'note', 'source'];
 const TEMPLATE_HEADER = ['id', 'order', 'name', 'summary', 'json'];
 const CARDIO_HEADER = ['id', 'date', 'type', 'name', 'minutes', 'distance_mi', 'elevation_ft', 'avg_hr', 'effort', 'elapsed_min'];
+const BODY_HEADER = ['date', 'weight_lb'];
 const CARDIO_DAYS = 400;            // how far back the app receives cardio
 const STRAVA_MIN_GAP_MS = 5 * 60e3; // don't call Strava more often than this
 
@@ -83,6 +84,11 @@ function handle_(req) {
         writeTemplates_(sh.templates, req.templates);
       }
 
+      if (Array.isArray(req.body)) {
+        const rows = req.body.filter(b => b && b.date && b.lb > 0).map(b => [String(b.date), Number(b.lb)]);
+        rewrite_(sh.body, BODY_HEADER.length, () => false, rows, 0);
+      }
+
       let cardio = null;
       if (req.cardio !== false && props.getProperty('STRAVA_REFRESH')) {
         try { fetchStrava_(sh.cardio, !!req.forceCardio); props.deleteProperty('STRAVA_ERROR'); }
@@ -115,7 +121,8 @@ function setup_(ss) {
     workouts: get(TABS.workouts, WORKOUT_HEADER, [1, 2, 10, 11]),
     sets: get(TABS.sets, SET_HEADER, [1, 2, 5]),
     templates: get(TABS.templates, TEMPLATE_HEADER, [1, 5]),
-    cardio: get(TABS.cardio, CARDIO_HEADER, [1, 2])
+    cardio: get(TABS.cardio, CARDIO_HEADER, [1, 2]),
+    body: get(TABS.body, BODY_HEADER, [1])
   };
   const blank = ss.getSheetByName('Sheet1');
   if (blank && ss.getSheets().length > 1 && blank.getLastRow() === 0) ss.deleteSheet(blank);

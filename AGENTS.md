@@ -31,6 +31,13 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 | `ll.strava.v1` | Last Strava status from the script: `{connected, hasApp, last, error}`. |
 | `ll.goal` | Weekly goal `{lifts, cardio}`. |
 | `ll.exnotes.v1` | Pinned per-exercise notes `{ [exerciseName]: text }`. |
+| `ll.block` | Training block `{name, start: 'YYYY-MM-DD'|null, weeks, trips: ['YYYY-MM-DD']}`. Deload = last week, or any week with a trip in the next 7 days. |
+| `ll.cfg` | `{sound, easyPace: 'M:SS', runBase, runMax, intBase, intMax, claudeUrl}`. |
+| `ll.checkins` | `{ [workoutId]: {v: 'better'|'same'|'worse', at} }`. A "worse" in the last 72 h makes `suggestFor()` return ~90% of last top weight. |
+| `ll.body` | Body-weight log `[{date: 'YYYY-MM-DD', lb}]`, sorted. |
+| `ll.bars` | Per-exercise bar weight for plate math `{ [exerciseName]: lb | 0 (plates only) | null (none) }`. Defaults in `barFor()`. |
+| `ll.intdone` | Interval session ticked off, keyed by the Monday of the week. |
+| `ll.howto` | Cache of wger lookups `{ [exerciseName]: {status, data} }`. Delete to retry misses. |
 
 ## Data model
 
@@ -101,7 +108,8 @@ The app POSTs JSON (sent as `text/plain` to avoid a CORS preflight) to the Apps 
   "templates": [ /* written if replaceTemplates is true, or if the sheet's Templates tab is empty */ ],
   "replaceTemplates": false,    // true after the user edits templates in the app
   "cardio": true,               // ask for Cardio rows back (and fetch Strava if connected)
-  "forceCardio": false          // fetch Strava now even if fetched in the last 5 minutes
+  "forceCardio": false,         // fetch Strava now even if fetched in the last 5 minutes
+  "body": [ {"date": "YYYY-MM-DD", "lb": 180.2} ]   // optional; when present, replaces the Body tab
 }
 ```
 
@@ -119,8 +127,15 @@ Script Properties used: `TOKEN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `ST
 - **Sets:** `workout_id, date, workout, exercise, set, type, weight_lb, reps, seconds, distance, rpe, note, source` — one row per completed set. Best tab for analysis.
 - **Templates:** `id, order, name, summary, json`. Edit the `json` cell to change a template; it reaches the phone on its next sync (unless the phone has unsynced template edits, which win).
 - **Cardio:** `id, date, type, name, minutes, distance_mi, elevation_ft, avg_hr, effort, elapsed_min` — one row per Strava activity except WeightTraining, upserted by id.
+- **Body:** `date, weight_lb` — the app's body-weight log, replaced wholesale on each change.
 
 `date` is local time `YYYY-MM-DD HH:MM`. `source` is `lift-log` or `strong`. Rows are kept sorted by date.
+
+## External services (all optional, online only)
+
+- **wger.de** (`loadHowto()`): `GET /api/v2/exercise-translation/?language=2&name=…` (exact, case-sensitive match) then `/api/v2/exerciseinfo/{id}/`. Strong names like `Squat (Barbell)` are tried as an alias from `HOW_ALIAS`, then the full name, then the name without the equipment suffix and plural forms. Images are CC-BY-SA and similar — keep the attribution line. Add aliases to `HOW_ALIAS` when an exercise doesn't match.
+- **Claude:** "Ask Claude" opens `https://claude.ai/new?q=<prompt>` (prompt capped at 1800 chars, and it contains no workout numbers — Claude reads them from the sheet). If the user saved a project link in `ll.cfg.claudeUrl`, the prompt is copied to the clipboard and the project opens instead.
+- The service worker only caches same-origin files and Google Fonts; these requests go straight to the network.
 
 ## Testing changes
 

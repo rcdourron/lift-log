@@ -12,8 +12,15 @@ A free, offline-first lifting tracker you install on your phone's home screen. N
 - **Exercise history and PRs.** Tap an exercise name for your records and recent sessions. Beating your best estimated 1-rep max or heaviest set flags the set as a PR.
 - **Supersets.** Link exercises from the ••• menu; the rest timer starts only after the last exercise in the group.
 - **Strava cardio (optional).** Runs, rides and other activities show up in History and count toward a weekly goal shown on the start screen.
-- **Rest timer** that starts when you check off a set, using each exercise's own rest time.
-- **Plate math** for barbell lifts (plates per side on a 45 lb bar).
+- **Training blocks.** Set a block name, start date, length and ski trips (Data tab). The start screen shows "Week 3 of 8 · Build", the last week and the week before each trip are deloads (template sets are halved automatically), and it sets that week's cardio targets: an easy run that grows 5 minutes every two weeks (ticked off automatically from Strava) and interval rounds that grow by one.
+- **Easy-pace check.** Runs faster than your easy pace are flagged.
+- **Next-day check-in.** The day after a session the app asks whether you feel better, the same or worse. "Worse" makes the next few days' suggested weights about 10% lighter.
+- **Finish summary**: duration, sets, volume against your last comparable session, and new PRs.
+- **Rest timer** that starts when you check off a set, using each exercise's own rest time, with a beep (toggle on the Data tab) and auto-scroll to the next set.
+- **Plate math** for any bar: pick the bar per exercise in its ••• menu (45 lb by default for barbell lifts, 55 for trap bar, plates only for landmine).
+- **How-to diagrams (online only).** An exercise's history sheet shows images, a muscle map and a description from the open [wger](https://wger.de) exercise database when it has a match, plus a link to form videos.
+- **Body weight log** with a trend line, synced to the sheet.
+- **Ask Claude.** Opens Claude with a ready-made prompt (weekly check-in, plan the next session, review a workout). Paste a Claude Project link on the Data tab to send prompts there instead, so conversations and plans stay in one place.
 - **Timed and distance sets** (planks, wall sits, carries) alongside regular reps.
 - **History and progress charts**: estimated one-rep max over time, heaviest set, PR tags, 3-month / 1-year / all-time ranges.
 - **Strong import.** Load your full history from the Strong app's CSV export, and re-import later without duplicates.
@@ -59,7 +66,7 @@ The first sync sends your Strong history, templates and every finished workout. 
 
 "Anyone" only means the URL works without a Google sign-in. The first copy of Lift Log that connects registers a random secret with the script; requests without it are refused. To link a different phone or start over, delete the `TOKEN` entry under **Apps Script → Project Settings → Script Properties**.
 
-The sheet gets three tabs: **Workouts** (one row per session), **Sets** (one row per set) and **Templates** (one row per template, with its full definition as JSON).
+The sheet gets these tabs: **Workouts** (one row per session), **Sets** (one row per set), **Templates** (one row per template, with its full definition as JSON), **Cardio** (Strava, if connected) and **Body** (body-weight log).
 
 ### Strava cardio (optional, needs Sheets sync)
 
