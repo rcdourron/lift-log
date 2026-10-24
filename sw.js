@@ -1,7 +1,7 @@
 /* Lift Log service worker.
    Bump VERSION every time you change ANY file in this folder. That change is what
    makes the app show "New features available! [Tap to Update]" on your phone. */
-const VERSION = '2026-10-24.7';
+const VERSION = '2026-10-24.8';
 const CACHE = 'lift-log-' + VERSION;
 const FONT_CACHE = 'lift-log-fonts';
 const ASSETS = [

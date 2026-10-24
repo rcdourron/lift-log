@@ -11,12 +11,14 @@
  * Strava credentials (if you connect Strava) are kept in this script's properties, never in the app.
  */
 
-const TABS = { workouts: 'Workouts', sets: 'Sets', templates: 'Templates', cardio: 'Cardio', body: 'Body' };
+const TABS = { workouts: 'Workouts', sets: 'Sets', templates: 'Templates', cardio: 'Cardio', body: 'Body', insights: 'Insights' };
 const WORKOUT_HEADER = ['id', 'date', 'name', 'source', 'template', 'minutes', 'sets', 'volume_lb', 'notes', 'updated_at', 'json'];
 const SET_HEADER = ['workout_id', 'date', 'workout', 'exercise', 'set', 'type', 'weight_lb', 'reps', 'seconds', 'distance', 'rpe', 'note', 'source'];
 const TEMPLATE_HEADER = ['id', 'order', 'name', 'summary', 'json'];
 const CARDIO_HEADER = ['id', 'date', 'type', 'name', 'minutes', 'distance_mi', 'elevation_ft', 'avg_hr', 'effort', 'elapsed_min'];
 const BODY_HEADER = ['date', 'weight_lb'];
+// Insights are written by Claude (for example a scheduled task with the Google Sheets connector), one row per activity.
+const INSIGHT_HEADER = ['id', 'kind', 'date', 'insight', 'created_at'];
 const CARDIO_DAYS = 400;            // how far back the app receives cardio
 const STRAVA_MIN_GAP_MS = 5 * 60e3; // don't call Strava more often than this
 
@@ -96,7 +98,7 @@ function handle_(req) {
       }
       if (req.cardio !== false) cardio = readCardio_(sh.cardio);
 
-      return { ok: true, wrote: all.length, templates: readTemplates_(sh.templates), cardio: cardio, strava: stravaStatus_() };
+      return { ok: true, wrote: all.length, templates: readTemplates_(sh.templates), cardio: cardio, insights: readInsights_(sh.insights), strava: stravaStatus_() };
     }
     return { ok: false, error: 'unknown_op' };
   } catch (err) {
@@ -122,7 +124,8 @@ function setup_(ss) {
     sets: get(TABS.sets, SET_HEADER, [1, 2, 5]),
     templates: get(TABS.templates, TEMPLATE_HEADER, [1, 5]),
     cardio: get(TABS.cardio, CARDIO_HEADER, [1, 2]),
-    body: get(TABS.body, BODY_HEADER, [1])
+    body: get(TABS.body, BODY_HEADER, [1]),
+    insights: get(TABS.insights, INSIGHT_HEADER, [1])
   };
   const blank = ss.getSheetByName('Sheet1');
   if (blank && ss.getSheets().length > 1 && blank.getLastRow() === 0) ss.deleteSheet(blank);
@@ -298,6 +301,18 @@ function fetchStrava_(sheet, force) {
   p.setProperty('STRAVA_LAST', String(Date.now()));
 }
 
+function readInsights_(sheet) {
+  const last = sheet.getLastRow();
+  const out = {};
+  if (last < 2) return out;
+  sheet.getRange(2, 1, last - 1, INSIGHT_HEADER.length).getValues().forEach(r => {
+    const id = String(r[0]).trim();
+    if (!id || !String(r[3]).trim()) return;
+    out[id] = { text: String(r[3]).slice(0, 1200), at: r[4] instanceof Date ? r[4].toISOString() : String(r[4] || '') };
+  });
+  return out;
+}
+
 function readCardio_(sheet) {
   const last = sheet.getLastRow();
   if (last < 2) return [];
@@ -305,5 +320,5 @@ function readCardio_(sheet) {
   return sheet.getRange(2, 1, last - 1, CARDIO_HEADER.length).getValues()
     .filter(r => r[0] !== '' && String(r[1]) >= cutoff)
     .map(r => ({ id: String(r[0]), date: String(r[1]), type: String(r[2]), name: String(r[3]), minutes: Number(r[4]) || 0,
-      miles: Number(r[5]) || 0, elev_ft: Number(r[6]) || 0, hr: r[7] === '' ? null : Number(r[7]), effort: r[8] === '' ? null : Number(r[8]) }));
+      miles: Number(r[5]) || 0, elev_ft: Number(r[6]) || 0, hr: r[7] === '' ? null : Number(r[7]), effort: r[8] === '' ? null : Number(r[8]), elapsed: Number(r[9]) || 0 }));
 }

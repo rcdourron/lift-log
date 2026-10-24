@@ -37,6 +37,7 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 | `ll.body` | Body-weight log `[{date: 'YYYY-MM-DD', lb}]`, sorted. |
 | `ll.bars` | Per-exercise bar weight for plate math `{ [exerciseName]: lb | 0 (plates only) | null (none) }`. Defaults in `barFor()`. |
 | `ll.intdone` | Interval session ticked off, keyed by the Monday of the week. |
+| `ll.insights.v1` | `{ [workoutId or Strava id]: {text, at} }` from the sheet's Insights tab. Read-only in the app. |
 | `ll.undo` | Snapshot `{id, exercises, plan, at}` taken before the last Claude adjustment or swap, for Undo. Cleared on finish. |
 | `ll.howto` | Cache of wger lookups `{ [exerciseName]: {status, data} }`. Delete to retry misses. |
 
@@ -114,7 +115,7 @@ The app POSTs JSON (sent as `text/plain` to avoid a CORS preflight) to the Apps 
 }
 ```
 
-Response: `{ ok: true, wrote: n, templates: [...], cardio: [{id, date, type, name, minutes, miles, elev_ft, hr, effort}], strava: {connected, hasApp, last, error} }` or `{ ok: false, error: "bad_token" | "no_token" | "bad_json" | "unknown_op" | message }`. The app replaces its local templates with the sheet's whenever they differ, so the sheet is the source of truth for templates once it has any.
+Response: `{ ok: true, wrote: n, templates: [...], cardio: [{id, date, type, name, minutes, miles, elev_ft, hr, effort, elapsed}], insights: {[id]: {text, at}}, strava: {connected, hasApp, last, error} }` or `{ ok: false, error: "bad_token" | "no_token" | "bad_json" | "unknown_op" | message }`. The app replaces its local templates with the sheet's whenever they differ, so the sheet is the source of truth for templates once it has any.
 
 The first token a script sees is stored in Script Properties as `TOKEN`; later requests must match it.
 
@@ -129,6 +130,7 @@ Script Properties used: `TOKEN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `ST
 - **Templates:** `id, order, name, summary, json`. Edit the `json` cell to change a template; it reaches the phone on its next sync (unless the phone has unsynced template edits, which win).
 - **Cardio:** `id, date, type, name, minutes, distance_mi, elevation_ft, avg_hr, effort, elapsed_min` — one row per Strava activity except WeightTraining, upserted by id.
 - **Body:** `date, weight_lb` — the app's body-weight log, replaced wholesale on each change.
+- **Insights:** `id, kind, date, insight, created_at` — written by Claude or any other tool, never by the app. `id` matches a Workouts `id` (Lift Log or `strong-…`) or a Cardio `id` (Strava activity id); `kind` is `lift` or `cardio`. The sync response includes them as `insights: { [id]: {text, at} }` and the app shows them on that activity's detail page.
 
 `date` is local time `YYYY-MM-DD HH:MM`. `source` is `lift-log` or `strong`. Rows are kept sorted by date.
 

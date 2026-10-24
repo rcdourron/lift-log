@@ -20,6 +20,8 @@ A free, offline-first lifting tracker you install on your phone's home screen. N
 - **Plate math** for any bar: pick the bar per exercise in its ••• menu (45 lb by default for barbell lifts, 55 for trap bar, plates only for landmine).
 - **How-to diagrams (online only).** An exercise's history sheet shows images, a muscle map and a description from the open [wger](https://wger.de) exercise database when it has a match, plus a link to form videos.
 - **Adjust a workout mid-session with Claude.** Tap **Adjust with Claude**, say what's going on ("back feels tight", "hotel gym, dumbbells only"). Lift Log copies a prompt with what you've done and what's left and opens Claude. Copy Claude's reply back, preview the changes and apply them. Finished sets are never touched, and there's an Undo.
+- **Workout and activity details.** Tap anything in History for every set (with estimated 1RM and PRs), comparisons with the last time you did that workout or exercise, and for Strava activities pace, heart rate and how they compare with your recent ones.
+- **Claude's take (optional).** Each detail page shows a short insight written by Claude. Claude writes these into an **Insights** tab of your sheet (for example from a scheduled task with the Google Sheets connector) and the app picks them up on sync. Without it, the page offers "Ask Claude about this now".
 - **Swap exercise** from any exercise's ••• menu, with similar movements listed first. Reps carry over, finished sets stay.
 - **Body weight log** with a trend line, synced to the sheet.
 - **Ask Claude.** Opens Claude with a ready-made prompt (weekly check-in, plan the next session, review a workout). Paste a Claude Project link on the Data tab to send prompts there instead, so conversations and plans stay in one place.
@@ -68,7 +70,7 @@ The first sync sends your Strong history, templates and every finished workout. 
 
 "Anyone" only means the URL works without a Google sign-in. The first copy of Lift Log that connects registers a random secret with the script; requests without it are refused. To link a different phone or start over, delete the `TOKEN` entry under **Apps Script → Project Settings → Script Properties**.
 
-The sheet gets these tabs: **Workouts** (one row per session), **Sets** (one row per set), **Templates** (one row per template, with its full definition as JSON), **Cardio** (Strava, if connected) and **Body** (body-weight log).
+The sheet gets these tabs: **Workouts** (one row per session), **Sets** (one row per set), **Templates** (one row per template, with its full definition as JSON), **Cardio** (Strava, if connected), **Body** (body-weight log) and **Insights** (Claude's notes on each activity: `id, kind, date, insight, created_at`; anything that can write to your sheet can fill it).
 
 ### Strava cardio (optional, needs Sheets sync)
 

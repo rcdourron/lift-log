@@ -276,6 +276,16 @@ textarea.notes{width:100%;min-height:70px;border:1px solid var(--line);backgroun
 .spark{width:100%;height:60px;display:block}
 .chg{display:flex;flex-direction:column;gap:6px;font-size:14px}.chg div{background:var(--sunk);border-radius:8px;padding:8px 10px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+.hcard[data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}.hcard[data-act]:active{opacity:.85}
+.more{color:var(--muted);font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.take{background:var(--sunk);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.take b.eyebrow{font-size:12px}
+.dstats{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px}
+.dstats div{background:var(--sunk);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}
+.dstats small{color:var(--muted);font-size:12px}.dstats b{font-size:18px}
+.glance{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.stbl{width:100%;border-collapse:collapse;font-size:14px}.stbl td,.stbl th{padding:5px 4px;text-align:left;border-bottom:1px solid var(--line)}.stbl th{font-size:12px;color:var(--muted);font-weight:600}
+.up{color:var(--done)}.down{color:var(--accent)}
 .inrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .inrow input{flex:1;min-width:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
@@ -323,7 +333,7 @@ const fmtMin=ms=>{const m=Math.round(ms/60000);return m>=60?`${Math.floor(m/60)}
 const fmtVol=v=>v>=10000?(Math.round(v/100)/10)+'k':Math.round(v).toLocaleString();
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
-const S={remote:new Map(),loaded:false,tab:'workout',editId:null,picker:false,q:'',confirm:null,prog:null,range:'1y',histN:30,strong:new Map(),strongMeta:null,templates:[],cardio:[],strava:null,tplEdit:null,hfilter:'all',goal:lsGet('ll.goal',{lifts:2,cardio:2}),block:lsGet('ll.block',{name:'Fall 26',start:null,weeks:8,trips:[]}),cfg:lsGet('ll.cfg',{sound:true,easyPace:'10:20',runBase:35,runMax:50,intBase:6,intMax:10,claudeUrl:''}),checkins:lsGet('ll.checkins',{}),undo:lsGet('ll.undo',null),swap:null,body:lsGet('ll.body',[]),bars:lsGet('ll.bars',{}),intDone:lsGet('ll.intdone',{}),howto:{},mode:'connecting',saveState:'',banner:''};
+const S={remote:new Map(),loaded:false,tab:'workout',editId:null,picker:false,q:'',confirm:null,prog:null,range:'1y',histN:30,strong:new Map(),strongMeta:null,templates:[],cardio:[],strava:null,tplEdit:null,hfilter:'all',goal:lsGet('ll.goal',{lifts:2,cardio:2}),block:lsGet('ll.block',{name:'Fall 26',start:null,weeks:8,trips:[]}),cfg:lsGet('ll.cfg',{sound:true,easyPace:'10:20',runBase:35,runMax:50,intBase:6,intMax:10,claudeUrl:''}),checkins:lsGet('ll.checkins',{}),undo:lsGet('ll.undo',null),swap:null,insights:lsGet('ll.insights.v1',{}),detail:null,body:lsGet('ll.body',[]),bars:lsGet('ll.bars',{}),intDone:lsGet('ll.intdone',{}),howto:{},mode:'connecting',saveState:'',banner:''};
 const drafts=new Map();
 let store=null, pendingRender=false;
 let rest={until:0,len:lsGet('ll.rest',120),timer:null,doneAt:0};
@@ -351,8 +361,8 @@ function onRemote(entries){S.remote=new Map(entries);S.loaded=true;const cur=act
     if(id!==cur&&(r.updatedAt||'')>=(d.data.updatedAt||''))drafts.delete(id)}
   if(S.saveState==='')setSave('');renderSoon()}
 
-const APP_VERSION='2026-10-24.7';
-const K={w:'ll.workouts.v1',s:'ll.strong.v1',t:'ll.templates.v1',c:'ll.cardio.v1',sv:'ll.strava.v1'};
+const APP_VERSION='2026-10-24.8';
+const K={w:'ll.workouts.v1',s:'ll.strong.v1',t:'ll.templates.v1',c:'ll.cardio.v1',sv:'ll.strava.v1',i:'ll.insights.v1'};
 function lsRead(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
 function lsWrite(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
 function applyStrong(st){const m=new Map();((st&&st.workouts)||[]).forEach(w=>m.set(w.sid,{...w,source:'strong',finished:true}));S.strong=m;S.strongMeta=(st&&st.meta)||null}
@@ -442,6 +452,7 @@ async function syncNow(manual){
     SY.pend=SY.pend.filter(x=>!ids.includes(x));SY.dels=SY.dels.filter(x=>!dels.includes(x));if(doStrong)SY.strong=false;SY.last=new Date().toISOString();SY.err='';
     if(doTpl)SY.tplSent=tplRev;if(body.body)SY.bodySent=bodyRev;
     else if((SY.tplRev||0)<=(SY.tplSent||0)&&Array.isArray(res.templates)&&res.templates.length&&JSON.stringify(res.templates)!==JSON.stringify(lsRead(K.t)||[])){lsWrite(K.t,res.templates);applyTemplates(res.templates);renderSoon()}
+    if(res.insights&&typeof res.insights==='object'){S.insights=res.insights;lsSet(K.i,res.insights);renderSoon()}
     if(Array.isArray(res.cardio)){S.cardio=res.cardio;lsWrite(K.c,res.cardio);SY.lastCardio=new Date().toISOString();renderSoon()}
     if(res.strava){S.strava=res.strava;lsWrite(K.sv,res.strava)}
     saveSY();if(manual)flash('Synced to Google Sheets.');
@@ -716,8 +727,8 @@ function askPrompt(k){const bi=blockInfo();const blk=bi&&!bi.pre&&!bi.done?` I'm
 /* ---------- cardio helpers ---------- */
 function cardioPace(c){if(!(c.miles>0)||!/Run|Walk|Hike/.test(c.type))return '';const m=c.minutes/c.miles;return Math.floor(m)+':'+String(Math.round((m%1)*60)).padStart(2,'0')+'/mi'}
 function cardioCard(c){const pace=cardioPace(c);const when=new Date(String(c.date).replace(' ','T'));
-  return `<article class="hcard cardio"><div class="row split"><span class="hdate">${esc(when.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))} · ${esc(c.type)}</span><span class="src strava">Strava</span></div>
-  <h3 class="hname">${esc(c.name)}</h3>${tooFast(c)?`<div><span class="tag2">Faster than easy pace</span></div>`:''}<div class="cmeta">${c.miles?`<span><small>Distance</small>${fw(c.miles)} mi</span>`:''}<span><small>Time</small>${fmtSecs(Math.round(c.minutes*60))}</span>${pace?`<span><small>Pace</small>${pace}</span>`:''}${c.elev_ft?`<span><small>Elev</small>${c.elev_ft} ft</span>`:''}${c.hr?`<span><small>Avg HR</small>${c.hr}</span>`:''}</div></article>`}
+  return `<article class="hcard cardio" data-act="detail" data-kind="c" data-id="${esc(c.id)}" role="button" tabindex="0"><div class="row split"><span class="hdate">${esc(when.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))} · ${esc(c.type)}</span><span class="src strava">Strava</span></div>
+  <h3 class="hname">${esc(c.name)}</h3>${tooFast(c)?`<div><span class="tag2">Faster than easy pace</span></div>`:''}<div class="cmeta">${c.miles?`<span><small>Distance</small>${fw(c.miles)} mi</span>`:''}<span><small>Time</small>${fmtSecs(Math.round(c.minutes*60))}</span>${pace?`<span><small>Pace</small>${pace}</span>`:''}${c.elev_ft?`<span><small>Elev</small>${c.elev_ft} ft</span>`:''}${c.hr?`<span><small>Avg HR</small>${c.hr}</span>`:''}</div><div class="more"><span>${S.insights[c.id]?"✦ Claude's take":''}</span><span>Details ›</span></div></article>`}
 
 function startScreen(){const fs=finished();const now=new Date();const mon=new Date(now);mon.setHours(0,0,0,0);mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
   const wk=fs.filter(w=>new Date(w.startedAt)>=mon);const vol=wk.reduce((a,w)=>a+workVol(w),0);
@@ -770,7 +781,7 @@ function hint(x,si,pv){const k=uk(x),s0=x.sets[si];if(s0&&(s0.tw!=null||s0.tr!=n
   for(let i=si-1;i>=0;i--){const s=x.sets[i];if(s.w!=null||s[k]!=null)return {w:s.w,r:s[k]};if(s.tw!=null||s.tr!=null)return {w:s.tw,r:s.tr}}
   const l=pv&&pv.sets[pv.sets.length-1];return l?{w:l.w,r:l[k]}:{w:null,r:null}}
 
-function history(){const fs=finished();const cs=S.cardio||[];
+function history(){if(S.detail){const v=detailView();if(v)return v;S.detail=null}const fs=finished();const cs=S.cardio||[];
   let h=`<h1 style="font-size:30px;text-transform:uppercase">History</h1>
   <div class="chips">${[['all','All'],['lifts','Lifts'],['cardio','Cardio']].map(([k,l])=>`<button class="chip${S.hfilter===k?' on':''}" data-act="hfilter" data-v="${k}">${l}</button>`).join('')}</div>
   <div class="muted" style="font-size:14px">${fs.length} workouts${S.strongMeta?` (${fs.filter(w=>w.source==='strong').length} from Strong)`:''} · ${cs.length} cardio sessions from Strava</div>`;
@@ -781,13 +792,66 @@ function history(){const fs=finished();const cs=S.cardio||[];
   items.slice(0,S.histN).forEach(({t,w,c})=>{const m=new Date(t).toLocaleDateString(undefined,{month:'long',year:'numeric'});if(m!==mo){mo=m;h+=`<div class="month">${esc(m)}</div>`}
     if(c){h+=cardioCard(c);return}
     const dur=w.endedAt?fmtMin(new Date(w.endedAt)-new Date(w.startedAt)):'';const k='del'+w.id;
-    h+=`<article class="hcard"><div class="row split"><span class="hdate">${esc(fmtDate(w.startedAt))}${dur?' · '+dur:''} · ${fmtVol(workVol(w))} lb</span>${w.source==='strong'?'<span class="src">Strong</span>':'<span class="src mine">Lift Log</span>'}</div>
+    h+=`<article class="hcard" data-act="detail" data-kind="w" data-id="${esc(w.id)}" role="button" tabindex="0"><div class="row split"><span class="hdate">${esc(fmtDate(w.startedAt))}${dur?' · '+dur:''} · ${fmtVol(workVol(w))} lb</span>${w.source==='strong'?'<span class="src">Strong</span>':'<span class="src mine">Lift Log</span>'}</div>
     <h3 class="hname">${esc(w.name)}</h3><div class="hlines">${(w.exercises||[]).map(x=>{const b=bestSet(x.sets);return `<div class="hline"><span>${esc(x.name)}</span><span>${x.sets.filter(s=>s.done).length} sets${b?' · top '+setTxt(b):''}${x.sets.some(s=>s.pr)?'<span class="prtag">PR</span>':''}</span></div>`}).join('')}</div>
     ${w.notes?`<div class="muted" style="font-size:14px">${esc(w.notes)}</div>`:''}
     <div class="row">${w.source==='strong'?'':`<button class="btn small" data-act="edit" data-id="${w.id}">Edit</button>`}<button class="btn small" data-act="tplfrom" data-id="${esc(w.id)}">Save as template</button>${w.source==='strong'?'':`<button class="btn small ${S.confirm===k?'warn':'ghost'}" data-act="del" data-id="${w.id}">${S.confirm===k?'Delete for good?':'Delete'}</button>`}</div>
-    ${w.source==='strong'?'<div class="muted" style="font-size:13px">Edit this one in Strong; it refreshes when you import your next export.</div>':''}</article>`});
+    <div class="more"><span>${S.insights[w.id]?"✦ Claude's take":''}</span><span>Details ›</span></div></article>`});
   if(items.length>S.histN)h+=`<button class="btn block" data-act="more">Show ${Math.min(30,items.length-S.histN)} more</button>`;
   return h}
+
+/* ---------- activity detail ---------- */
+const pct=(a,b)=>b?Math.round((a/b-1)*100):null;
+const sgn=v=>v==null?'':(v>0?'+':'')+v+'%';
+const cls=v=>v==null||v===0?'':v>0?'up':'down';
+function prevSame(w){const t=Date.parse(w.startedAt);return finished().find(x=>x.id!==w.id&&Date.parse(x.startedAt)<t&&(w.template?x.template===w.template:x.name===w.name))||null}
+function prevEx(name,t,excl){for(const x of finished()){if(x.id===excl||!(Date.parse(x.startedAt)<t))continue;const e=(x.exercises||[]).find(y=>y.name===name);if(e&&e.sets.some(q=>q.done!==false))return {w:x,x:e}}return null}
+function takeBox(id,kind){const t=S.insights[id];
+  return `<section class="take"><b class="eyebrow">✦ Claude's take</b>${t?`<div style="font-size:15px;line-height:1.45">${esc(t.text||t)}</div>${t.at?`<div class="attr">Written ${esc(fmtShort(t.at))}</div>`:''}`
+    :`<div class="muted" style="font-size:14px">${SY.url?"Claude writes a short take on each new workout and Strava activity twice a day (about 6:45 am and 9:45 pm). It shows up here after the app's next sync.":"Connect Google Sheets sync on the Data tab and Claude will write a short take on each new workout and Strava activity."}</div>`}
+    <button class="btn info block" data-act="askd" data-kind="${kind}" data-id="${esc(id)}">${t?'Discuss with Claude':'Ask Claude about this now'}</button></section>`}
+function detailView(){const D=S.detail;const back=`<div><button class="btn small ghost" data-act="detailback">‹ History</button></div>`;
+  if(D.kind==='c'){const c=(S.cardio||[]).find(x=>String(x.id)===String(D.id));if(!c)return null;const when=new Date(String(c.date).replace(' ','T'));
+    const pace=cardioPace(c);const ride=/Ride/.test(c.type);const mph=ride&&c.minutes>0&&c.miles>0?(c.miles/(c.minutes/60)).toFixed(1):'';
+    const same=(S.cardio||[]).filter(x=>x.type===c.type&&x.id!==c.id&&Date.parse(String(x.date).replace(' ','T'))<when).slice(0,5);
+    const gl=[];if(same.length){const ap=same.filter(x=>x.miles>0);const avgMin=ap.reduce((a,x)=>a+x.minutes/x.miles,0)/(ap.length||1);
+      if(c.miles>0&&ap.length&&!ride){const d=c.minutes/c.miles-avgMin;gl.push(`Pace ${Math.abs(d)<0.08?'about the same as':Math.round(Math.abs(d)*60)+'s/mi '+(d<0?'faster than':'slower than')} ${ap.length===1?'your last '+c.type.toLowerCase():'your last '+ap.length+' '+c.type.toLowerCase()+'s'}.`)}
+      const ad=same.reduce((a,x)=>a+(x.miles||0),0)/same.length;if(c.miles&&ad)gl.push(`Distance ${sgn(pct(c.miles,ad))} vs your recent average (${fw(Math.round(ad*10)/10)} mi).`);
+      const hs=same.filter(x=>x.hr);if(c.hr&&hs.length){const ah=Math.round(hs.reduce((a,x)=>a+x.hr,0)/hs.length);gl.push(`Average heart rate ${c.hr} vs ${ah} recently.`)}}
+    if(c.type==='Run'){const bi=blockInfo();if(tooFast(c))gl.push(`Faster than your easy pace (${S.cfg.easyPace}/mi). If this was meant to be easy, slow it down.`);else if(c.minutes>=15&&paceMin(S.cfg.easyPace)!=null)gl.push('Easy-pace check: slower than '+S.cfg.easyPace+'/mi, so it counts as easy.');
+      if(bi&&!bi.pre&&!bi.done)gl.push(c.minutes>=bi.run*0.9?`Meets this week's easy-run target (${bi.run} min).`:`Short of this week's ${bi.run}-min easy-run target.`)}
+    return `${back}<div class="eyebrow">${esc(when.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}))} · ${esc(when.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}))}</div>
+    <h1 style="font-size:28px;text-transform:uppercase">${esc(c.name)}</h1><div><span class="src strava">Strava</span> <span class="muted">${esc(c.type)}</span></div>
+    <div class="dstats">${c.miles?`<div><small>Distance</small><b>${fw(c.miles)} mi</b></div>`:''}<div><small>Moving time</small><b>${fmtSecs(Math.round(c.minutes*60))}</b></div>${c.elapsed>c.minutes+1?`<div><small>Elapsed</small><b>${fmtSecs(Math.round(c.elapsed*60))}</b></div>`:''}${pace?`<div><small>Pace</small><b>${pace}</b></div>`:''}${mph?`<div><small>Speed</small><b>${mph} mph</b></div>`:''}${c.elev_ft?`<div><small>Elevation</small><b>${c.elev_ft} ft</b></div>`:''}${c.hr?`<div><small>Avg HR</small><b>${c.hr}</b></div>`:''}${c.effort?`<div><small>Effort</small><b>${c.effort}</b></div>`:''}</div>
+    ${takeBox(c.id,'c')}
+    ${gl.length?`<section class="panel"><div class="eyebrow">At a glance</div><ul class="glance">${gl.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></section>`:''}
+    ${/^\d+$/.test(String(c.id))?`<a class="btn block" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="https://www.strava.com/activities/${esc(c.id)}">Open in Strava</a>`:''}`}
+  const w0=getW(D.id);if(!w0||!w0.finished)return null;const w={...w0,id:D.id};const t=Date.parse(w.startedAt);const mins=w.endedAt?Math.round((Date.parse(w.endedAt)-t)/6e4):0;
+  const pv=prevSame(w);const vol=workVol(w),pvol=pv?workVol(pv):0;const pmin=pv&&pv.endedAt?Math.round((Date.parse(pv.endedAt)-Date.parse(pv.startedAt))/6e4):0;
+  const prs=[];const gl=[];const rows=[];
+  (w.exercises||[]).forEach(x=>{const k=uk(x);const sets=x.sets.filter(q=>q.done!==false);if(!sets.length)return;const b=bestSet(sets);const p=prevEx(x.name,t,w.id);const pb=p?bestSet(p.x.sets.filter(q=>q.done!==false)):null;
+    let cmp='';if(b&&pb&&k==='r'){const d=(b.e||0)-(pb.e||0);cmp=b.e&&pb.e?(Math.abs(d)<0.5?'= same top set as':d>0?'↑ up from':'↓ down from'):'';if(cmp)cmp=`<span class="${d>0.5?'up':d<-0.5?'down':''}">${cmp} ${esc(setTxt(pb))} (${esc(fmtShort(p.w.startedAt))})</span>`;
+      if(b.e&&pb.e&&d>0.5)gl.push(`${x.name}: top set ${setTxt(b)}, up from ${setTxt(pb)}.`);else if(b.e&&pb.e&&d<-0.5)gl.push(`${x.name}: top set ${setTxt(b)}, down from ${setTxt(pb)}.`)}
+    else if(!p)cmp='<span class="muted">First time logged</span>';
+    sets.forEach(q=>{if(q.pr)prs.push(x.name+' '+prevTxt(q,k))});
+    let n=0;rows.push(`<section class="panel"><div class="row split"><h3 style="font-size:17px">${esc(x.name)}</h3>${sets.some(q=>q.pr)?'<span class="prtag">PR</span>':''}</div>${cmp?`<div style="font-size:13px">${cmp}</div>`:''}
+      <table class="stbl"><thead><tr><th>Set</th><th>${k==='r'?'Weight × reps':k==='sec'?'Time':'Distance'}</th>${k==='r'?'<th>Est. 1RM</th>':''}</tr></thead><tbody>${sets.map(q=>{const lab=q.t==='W'?'W':q.t||String(++n);return `<tr><td>${lab}</td><td>${esc(prevTxt(q,k))}${q.pr?' <span class="prtag">PR</span>':''}</td>${k==='r'?`<td>${q.t!=='W'&&e1(q.w,q.r)?Math.round(e1(q.w,q.r)):''}</td>`:''}</tr>`}).join('')}</tbody></table>
+      ${x.note?`<div class="muted" style="font-size:13px">${esc(x.note)}</div>`:''}</section>`)});
+  if(pv){const dv=pct(vol,pvol);if(dv!=null&&vol&&pvol)gl.unshift(`Volume ${fmtVol(vol)} lb, ${sgn(dv)} vs last ${w.name} (${fmtShort(pv.startedAt)}).`);if(mins&&pmin)gl.push(`${mins} min, vs ${pmin} min last time.`)}
+  if(prs.length)gl.push(`${prs.length} PR${prs.length>1?'s':''}: ${prs.join(', ')}.`);
+  const k2='del'+w.id;
+  return `${back}<div class="eyebrow">${esc(new Date(t).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}))} · ${esc(new Date(t).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}))}</div>
+  <h1 style="font-size:28px;text-transform:uppercase">${esc(w.name)}</h1><div>${w.source==='strong'?'<span class="src">Strong</span>':'<span class="src mine">Lift Log</span>'}</div>
+  <div class="dstats"><div><small>Duration</small><b>${mins?mins+' min':'–'}</b></div><div><small>Sets</small><b>${doneCount(w)}</b></div><div><small>Volume</small><b>${fmtVol(vol)} lb</b></div><div><small>PRs</small><b>${prs.length}</b></div></div>
+  ${takeBox(w.id,'w')}
+  ${gl.length?`<section class="panel"><div class="eyebrow">At a glance</div><ul class="glance">${gl.slice(0,8).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></section>`:''}
+  ${w.notes?`<section class="panel"><div class="eyebrow">Notes</div><div>${esc(w.notes)}</div></section>`:''}
+  ${rows.join('')}
+  <div class="row">${w.source==='strong'?'':`<button class="btn small" data-act="edit" data-id="${w.id}">Edit</button>`}<button class="btn small" data-act="tplfrom" data-id="${esc(w.id)}">Save as template</button>${w.source==='strong'?'':`<button class="btn small ${S.confirm===k2?'warn':'ghost'}" data-act="del" data-id="${w.id}">${S.confirm===k2?'Delete for good?':'Delete'}</button>`}</div>
+  ${w.source==='strong'?'<div class="muted" style="font-size:13px">Edit this one in Strong; it refreshes when you import your next export.</div>':''}`}
+function detailPrompt(kind,id){const src='Use my Lift Log Google Sheet (Workouts, Sets, Templates, Cardio and Insights tabs) and my Strava.';
+  if(kind==='c'){const c=(S.cardio||[]).find(x=>String(x.id)===String(id));return `${src} Look at my Strava activity "${c?c.name:''}" on ${c?String(c.date).slice(0,10):''} (activity id ${id}). How did it go compared with my recent ${c?c.type.toLowerCase():''}s and my plan, and what should I change next time?`}
+  const w=getW(id);return `${src} Look at my "${w?w.name:''}" workout on ${w?dayKey(new Date(w.startedAt)):''} (workout id ${id} in the Workouts tab). How did it go compared with previous sessions and my plan, and what should I do next time?`}
 
 function progress(){const names=[...exNames().entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
   let h=`<h1 style="font-size:30px;text-transform:uppercase">Progress</h1>`;
@@ -940,7 +1004,7 @@ function sheetBody(){const sh=S.sheet;const id=activeId();const d=id?getW(id):nu
   if(sh.type==='ask'){const pre=[['week','Weekly check-in'],['next','Plan my next session'],['workout','Review my last workout'],['custom','Something else']];const k=sh.k||'week';
     return head('Ask Claude')+`<div class="muted" style="font-size:13px">Opens Claude, which can read your Lift Log sheet and Strava, so your conversation and plan are saved in Claude${S.cfg.claudeUrl?' (in your coach project)':''}.</div>
     <div class="opts">${pre.map(([v,l])=>`<button class="opt${k===v?' on':''}" data-act="askk" data-v="${v}">${l}</button>`).join('')}</div>
-    <textarea class="notes" id="askText" style="min-height:110px">${esc(askPrompt(k))}</textarea>
+    <textarea class="notes" id="askText" style="min-height:110px">${esc(sh.text&&k==='custom'?sh.text:askPrompt(k))}</textarea>
     <button class="btn primary block" data-act="askgo">Open in Claude</button>`}
   if(sh.type==='rest'){const on=rest.until&&!rest.doneAt;
     return head('Rest timer')+`<div class="bigtime" id="rt">${on?'':'—'}</div>
@@ -989,7 +1053,7 @@ main.addEventListener('input',e=>{const t=e.target;if(t.dataset.tf&&S.tplEdit){c
   if(f==='name')d.name=t.value;else if(f==='notes')d.notes=t.value;
   else{const x=d.exercises[+t.dataset.e],s=x.sets[+t.dataset.s];if(f==='w')s.w=num(t.value);else{const k=uk(x),r=num(t.value);s[k]=r==null?null:(k==='r'?Math.round(r):r)}}
   touch(id);const ms=$('mset'),mv=$('mvol');if(ms)ms.textContent=doneCount(d);if(mv)mv.textContent=fmtVol(workVol(d))});
-main.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.classList.contains('cell')){e.preventDefault();e.target.blur()}});
+main.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('hcard')){e.preventDefault();e.target.click();return}if(e.key==='Enter'&&e.target.classList.contains('cell')){e.preventDefault();e.target.blur()}});
 document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;renderPickList()}
   if(e.target.id==='texnote'&&S.tplEdit&&S.sheet){const x=S.tplEdit.data.exercises[S.sheet.e];if(x){if(e.target.value.trim())x.note=e.target.value;else delete x.note;S.tplEdit.dirty=true}}
   if(S.sheet&&S.sheet.type==='live'){if(e.target.id==='liveText')S.sheet.text=e.target.value;if(e.target.id==='liveReply')S.sheet.reply=e.target.value}
@@ -1005,7 +1069,7 @@ document.addEventListener('keydown',e=>{if(e.target.id==='q'&&e.key==='Enter'){c
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act;const prevConfirm=S.confirm;S.confirm=null;
   const id=activeId();const d=id?ensureDraft(id).data:null;
   switch(act){
-    case 'tab':S.tab=b.dataset.v;if(S.tab!=='workout')S.picker=false;render();window.scrollTo(0,0);break;
+    case 'tab':if(S.tab===b.dataset.v&&S.detail){S.detail=null;render();window.scrollTo(0,S.histY||0);break}S.detail=null;S.tab=b.dataset.v;if(S.tab!=='workout')S.picker=false;render();window.scrollTo(0,0);break;
     case 'start':{const nid=uid();const now=new Date();drafts.set(nid,{data:{name:DAYS[now.getDay()]+' Lift',startedAt:now.toISOString(),finished:false,exercises:[],notes:'',updatedAt:now.toISOString()},dirty:true,inflight:false,timer:null});touch(nid,true);S.picker=true;S.q='';render();wake();break}
     case 'tpl':{const t=S.templates.find(x=>x.id===b.dataset.id);if(!t)break;const nid=uid();const now=new Date();
       const exs=(t.exercises||[]).map(x=>({name:x.name,unit:x.unit,rest:x.rest,note:x.note,...(x.ss?{ss:x.ss}:{}),sets:(x.sets||[]).map(q=>({w:null,r:null,done:false,...(q.t?{t:q.t}:{}),tw:q.w??null,tr:q.r??null}))}));
@@ -1044,7 +1108,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
     case 'edit':S.editId=b.dataset.id;S.tab='workout';render();window.scrollTo(0,0);break;
     case 'del':{const k='del'+b.dataset.id;if(prevConfirm!==k){S.confirm=k;render();break}removeW(b.dataset.id);break}
     case 'range':S.range=b.dataset.v;render();break;
-    case 'hfilter':S.hfilter=b.dataset.v;S.histN=30;render();break;
+    case 'hfilter':S.hfilter=b.dataset.v;S.histN=30;S.detail=null;render();break;
     case 'checkin':{const w=lastLift();if(w){S.checkins[w.id]={v:b.dataset.v,at:new Date().toISOString()};lsSet('ll.checkins',S.checkins)}render();flash(b.dataset.v==='worse'?'Noted. Suggested weights drop about 10% for the next few days.':'Thanks, noted.');break}
     case 'intdone':S.intDone[b.dataset.v]=b.checked;lsSet('ll.intdone',S.intDone);break;
     case 'exbar':{const n=b.dataset.name,v=b.dataset.v;if(v==='none')S.bars[n]=null;else S.bars[n]=+v;lsSet('ll.bars',S.bars);render();break}
@@ -1060,7 +1124,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
     case 'liveprev':{if(!d)break;const rp=$('liveReply');S.sheet.reply=rp?rp.value:'';try{const ch=parseChanges(S.sheet.reply);S.sheet.pl=planChanges(d,ch);S.sheet.step='prev';S.sheet.err=''}catch(e){S.sheet.err=e.message}renderSheet();break}
     case 'liveapply':{if(!d||!S.sheet.pl)break;applyPlan(id,S.sheet.pl,"Claude's changes applied.");break}
     case 'undoadj':{const u=S.undo;if(!u||u.id!==id||!d)break;d.exercises=u.exercises;d.plan=u.plan;S.undo=null;lsSet('ll.undo',null);touch(id,true);render();flash('Changes undone.');break}
-    case 'askk':S.sheet={type:'ask',k:b.dataset.v};renderSheet();break;
+    case 'askk':S.sheet={type:'ask',k:b.dataset.v,text:S.sheet&&S.sheet.text};renderSheet();break;
     case 'askgo':{const t=($('askText')&&$('askText').value||'').trim();if(!t)break;const pu=S.cfg.claudeUrl;
       if(pu){try{navigator.clipboard&&navigator.clipboard.writeText(t)}catch(e){}window.open(pu,'_blank','noopener');flash('Prompt copied. Paste it into Claude.')}
       else window.open('https://claude.ai/new?q='+encodeURIComponent(t.slice(0,1800)),'_blank','noopener');break}
@@ -1109,6 +1173,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
     case 'checkupd':{const reg=window.__llReg;if(!reg){flash('Updates work once Lift Log is installed from your site.');break}
       flash('Checking…');reg.update().then(()=>{if(!reg.installing&&!reg.waiting)flash('You’re on the latest version.')}).catch(()=>flash('Couldn’t check. Are you online?'));break}
     case 'more':S.histN+=30;render();break;
+    case 'detail':S.histY=window.scrollY;S.detail={kind:b.dataset.kind,id:b.dataset.id};render();window.scrollTo(0,0);break;
+    case 'detailback':S.detail=null;render();window.scrollTo(0,S.histY||0);break;
+    case 'askd':S.sheet={type:'ask',k:'custom',text:detailPrompt(b.dataset.kind,b.dataset.id)};renderSheet();break;
     case 'rest':{const v=+b.dataset.v;if(!v){stopRest();break}rest.cur=Math.max(15,(rest.cur||rest.len)+v);if(!(d&&d.exercises&&d.exercises.some(x=>x.rest))){rest.len=rest.cur;lsSet('ll.rest',rest.len)}rest.until+=v*1000;updRest();break}
   }
   if(prevConfirm&&!S.confirm&&!['rmex','finish','discard','delcur','del','sheetdisc','tpldel','tplcancel','texrm','stravadisc'].includes(act))render();
