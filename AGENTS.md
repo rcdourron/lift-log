@@ -27,6 +27,10 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 | `ll.templates.v1` | `Template[]` |
 | `ll.sync.v1` | Sheets sync state: `{url, token, pend: [ids], dels: [ids], strong: bool, last, err}` |
 | `ll.rest` | Default rest-timer length in seconds. |
+| `ll.cardio.v1` | Cardio rows from the sheet's Cardio tab (see sync protocol), last ~400 days. Read-only in the app. |
+| `ll.strava.v1` | Last Strava status from the script: `{connected, hasApp, last, error}`. |
+| `ll.goal` | Weekly goal `{lifts, cardio}`. |
+| `ll.exnotes.v1` | Pinned per-exercise notes `{ [exerciseName]: text }`. |
 
 ## Data model
 
@@ -46,6 +50,7 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
       "name": "Bench Press (Barbell)",         // Strong's naming: "Lift (Equipment)"
       "unit": "sec",                           // optional: "sec" | "m"; default is reps
       "rest": 150,                             // optional rest seconds
+      "ss": "g1",                              // optional superset group id shared by adjacent exercises
       "note": "Coaching note",
       "sets": [
         { "w": 135, "r": 5, "done": true, "t": "W" },   // t: "W" warm-up, "D" drop, "F" failure
@@ -61,6 +66,8 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 - Weights are in pounds. `w: 0` means bodyweight. `tw` / `tr` on a set are template targets shown as placeholder hints.
 - Warm-up sets (`t: "W"`) are excluded from bests and estimated 1RM (Epley: `w × (1 + r/30)`).
 - Only `done: true` sets are kept when a workout is finished.
+- `pr: true` marks a set that beat the exercise's best estimated 1RM or heaviest weight when it was logged.
+- Smart progression (`suggestFor()`): looks at last session's working sets at the top weight. With template targets (`tr`), it suggests +5 lb (+10 for lifts matching `BIGSTEP`) when every one hit the target at RPE ≤ 8 (or no RPE logged), otherwise "stay". Without targets it only suggests an increase when every top set has RPE ≤ 8 logged.
 
 ```jsonc
 // Template
@@ -91,19 +98,27 @@ The app POSTs JSON (sent as `text/plain` to avoid a CORS preflight) to the Apps 
   "upserts": [ { "id": "…", "wrow": [/* Workouts row */], "srows": [[/* Sets rows */]] } ],
   "deletes": ["workoutId", …],
   "strong": [ /* same shape as upserts; when present, replaces ALL source=strong rows */ ],
-  "templates": [ /* written only if the sheet's Templates tab is empty */ ]
+  "templates": [ /* written if replaceTemplates is true, or if the sheet's Templates tab is empty */ ],
+  "replaceTemplates": false,    // true after the user edits templates in the app
+  "cardio": true,               // ask for Cardio rows back (and fetch Strava if connected)
+  "forceCardio": false          // fetch Strava now even if fetched in the last 5 minutes
 }
 ```
 
-Response: `{ ok: true, wrote: n, templates: [...] }` or `{ ok: false, error: "bad_token" | "no_token" | "bad_json" | "unknown_op" | message }`. The app replaces its local templates with the sheet's whenever they differ, so the sheet is the source of truth for templates once it has any.
+Response: `{ ok: true, wrote: n, templates: [...], cardio: [{id, date, type, name, minutes, miles, elev_ft, hr, effort}], strava: {connected, hasApp, last, error} }` or `{ ok: false, error: "bad_token" | "no_token" | "bad_json" | "unknown_op" | message }`. The app replaces its local templates with the sheet's whenever they differ, so the sheet is the source of truth for templates once it has any.
 
 The first token a script sees is stored in Script Properties as `TOKEN`; later requests must match it.
+
+Other ops: `{op:"strava_link"}` returns `{url}` for a one-time Strava setup page (30-minute state); `{op:"strava_disconnect"}` forgets the Strava tokens. The script's `doGet` serves that setup page (`?strava=setup&state=…`) and Strava's OAuth callback (`?code=…&state=…`).
+
+Script Properties used: `TOKEN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_ACCESS`, `STRAVA_REFRESH`, `STRAVA_EXPIRES`, `STRAVA_LAST`, `STRAVA_ERROR`, `STRAVA_STATE`, `STRAVA_STATE_AT`. Never put any of these in the repo or the app.
 
 ### Sheet layout
 
 - **Workouts:** `id, date, name, source, template, minutes, sets, volume_lb, notes, updated_at, json` (`json` = full workout).
 - **Sets:** `workout_id, date, workout, exercise, set, type, weight_lb, reps, seconds, distance, rpe, note, source` — one row per completed set. Best tab for analysis.
-- **Templates:** `id, order, name, summary, json`. Edit the `json` cell to change a template; it reaches the phone on its next sync.
+- **Templates:** `id, order, name, summary, json`. Edit the `json` cell to change a template; it reaches the phone on its next sync (unless the phone has unsynced template edits, which win).
+- **Cardio:** `id, date, type, name, minutes, distance_mi, elevation_ft, avg_hr, effort, elapsed_min` — one row per Strava activity except WeightTraining, upserted by id.
 
 `date` is local time `YYYY-MM-DD HH:MM`. `source` is `lift-log` or `strong`. Rows are kept sorted by date.
 

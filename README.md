@@ -7,7 +7,11 @@ A free, offline-first lifting tracker you install on your phone's home screen. N
 ## What it does
 
 - **Log workouts at the gym, offline.** Sets, reps and weight, with last session's numbers shown as hints so you can tap ✓ to repeat them.
-- **Templates.** Start a planned session with exercises, warm-up sets, start weights, rest times and coaching notes filled in.
+- **Templates.** Build them in the app (**+ Template**), or save any finished workout as one. Each holds exercises, warm-up sets, target weights and reps, rest times, coaching notes and supersets.
+- **Smart progression.** When every working set hit its target reps at RPE 8 or less last time, the app suggests adding 5 lb (10 lb for squats, deadlifts, leg press and hip thrusts) and pre-fills it. Otherwise it suggests holding the weight.
+- **Exercise history and PRs.** Tap an exercise name for your records and recent sessions. Beating your best estimated 1-rep max or heaviest set flags the set as a PR.
+- **Supersets.** Link exercises from the ••• menu; the rest timer starts only after the last exercise in the group.
+- **Strava cardio (optional).** Runs, rides and other activities show up in History and count toward a weekly goal shown on the start screen.
 - **Rest timer** that starts when you check off a set, using each exercise's own rest time.
 - **Plate math** for barbell lifts (plates per side on a 45 lb bar).
 - **Timed and distance sets** (planks, wall sits, carries) alongside regular reps.
@@ -56,6 +60,21 @@ The first sync sends your Strong history, templates and every finished workout. 
 "Anyone" only means the URL works without a Google sign-in. The first copy of Lift Log that connects registers a random secret with the script; requests without it are refused. To link a different phone or start over, delete the `TOKEN` entry under **Apps Script → Project Settings → Script Properties**.
 
 The sheet gets three tabs: **Workouts** (one row per session), **Sets** (one row per set) and **Templates** (one row per template, with its full definition as JSON).
+
+### Strava cardio (optional, needs Sheets sync)
+
+The sync script fetches Strava itself, so your Strava keys stay in your Google account, not on the phone.
+
+1. Make sure your sheet has the latest `Code.gs` deployed (see "Updating the script" below).
+2. In Lift Log: **Data → Strava cardio → Connect Strava → Open Strava setup.**
+3. The setup page tells you the callback domain to use. On Strava, open **Settings → My API Application** (strava.com/settings/api), create an app with that **Authorization Callback Domain** (any name, category and website), then paste its **Client ID** and **Client Secret** into the setup page.
+4. Tap **Continue to Strava**, approve, and when you see "Strava connected", go back to Lift Log and tap **Refresh**. The first fetch brings in the last year.
+
+After that, each sync checks Strava for new activities (at most every 5 minutes). Strava's weight-training entries are skipped so they don't double-count your lifts. Activities land in a **Cardio** tab in your sheet.
+
+### Updating the script
+
+When `Code.gs` changes: paste the new version into Apps Script, **Save**, then **Deploy → Manage deployments → ✏️ → Version: New version → Deploy**. The URL stays the same. If Google asks you to authorize again (new features such as Strava need new permissions), approve it.
 
 ## Updating your copy
 
