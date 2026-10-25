@@ -283,6 +283,13 @@ textarea.notes{width:100%;min-height:70px;border:1px solid var(--line);backgroun
 input.search{min-width:0;max-width:100%}
 input[type=date].search{-webkit-appearance:none;appearance:none;display:block;width:100%;min-height:46px;text-align:left;line-height:1.2}
 input[type=date].search::-webkit-date-and-time-value{text-align:left}
+.steps{display:flex;flex-direction:column;gap:14px;counter-reset:st}
+.step{background:var(--surface);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:8px;position:relative}
+.step>h3{margin:0;font-size:18px;display:flex;gap:10px;align-items:center}.step>h3:before{counter-increment:st;content:counter(st);display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-size:15px;flex:none}
+.step ol,.step ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:15px}.step .muted{font-size:14px}
+.step.done>h3:before{content:'✓';background:var(--done)}
+.qrbox{background:#fff;border-radius:12px;padding:14px;display:grid;place-items:center;align-self:center}
+kbd{font-family:inherit;font-weight:700;background:var(--sunk);border-radius:5px;padding:1px 6px}
 .phl{display:flex;flex-direction:column;gap:4px;font-size:14px}.phl div{display:flex;gap:8px}.phl b{min-width:64px}
 .hcard[data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}.hcard[data-act]:active{opacity:.85}
 .more{color:var(--muted);font-size:13px;display:flex;justify-content:space-between;align-items:center}
@@ -318,6 +325,9 @@ input[type=date].search::-webkit-date-and-time-value{text-align:left}
 </nav>
 
 <script>
+// A public, blank Google Sheet that already contains Code.gs. Forks: point this at your own template, or set it to '' to show manual steps.
+const TEMPLATE_COPY_URL='https://docs.google.com/spreadsheets/d/19g2WpsNpU-FjMDwktjjlulYA9n1d_QvDmajit1f7AWk/copy';
+const APP_HOME=location.origin+location.pathname.replace(/index\.html$/,'');
 const CFG0={sound:true,easyPace:'10:20',runBase:35,runStep:5,runEvery:2,runMax:50,intBase:6,intStep:1,intEvery:2,intMax:10,intWork:60,intRest:60,claudeUrl:''};
 (function(){
 const LIB=["Squat (Barbell)","Front Squat (Barbell)","Deadlift (Barbell)","Romanian Deadlift (Barbell)","Trap Bar Deadlift","Bench Press (Barbell)","Incline Bench Press (Barbell)","Overhead Press (Barbell)","Bent Over Row (Barbell)","Pull Up","Chin Up","Lat Pulldown (Cable)","Seated Row (Cable)","Bench Press (Dumbbell)","Incline Bench Press (Dumbbell)","Shoulder Press (Dumbbell)","Arnold Press (Dumbbell)","Bent Over One Arm Row (Dumbbell)","Bulgarian Split Squat","Lunge (Dumbbell)","Goblet Squat (Kettlebell)","Leg Press","Hip Thrust (Barbell)","Lying Leg Curl (Machine)","Leg Extension (Machine)","Seated Calf Raise (Plate Loaded)","Bicep Curl (Dumbbell)","Hammer Curl (Dumbbell)","Triceps Pushdown (Cable - Straight Bar)","Skullcrusher (Barbell)","Chest Dip","Lateral Raise (Dumbbell)","Face Pull (Cable)","Back Extension","Plank","Side Plank","Dead Bug","Bird Dog","Pallof Press","Glute Bridge","Farmers Walk"];
@@ -342,7 +352,7 @@ const fmtMin=ms=>{const m=Math.round(ms/60000);return m>=60?`${Math.floor(m/60)}
 const fmtVol=v=>v>=10000?(Math.round(v/100)/10)+'k':Math.round(v).toLocaleString();
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
-const S={remote:new Map(),loaded:false,tab:'workout',editId:null,picker:false,q:'',confirm:null,prog:null,range:'1y',histN:30,strong:new Map(),strongMeta:null,templates:[],cardio:[],strava:null,tplEdit:null,hfilter:'all',goal:lsGet('ll.goal',{lifts:2,cardio:2}),block:lsGet('ll.block',{name:'Fall 26',start:null,weeks:8,trips:[]}),cfg:{...CFG0,...lsGet('ll.cfg',{})},checkins:lsGet('ll.checkins',{}),undo:lsGet('ll.undo',null),swap:null,insights:lsGet('ll.insights.v1',{}),detail:null,body:lsGet('ll.body',[]),bars:lsGet('ll.bars',{}),intDone:lsGet('ll.intdone',{}),howto:{},mode:'connecting',saveState:'',banner:''};
+const S={remote:new Map(),loaded:false,tab:'workout',editId:null,picker:false,q:'',confirm:null,prog:null,range:'1y',histN:30,strong:new Map(),strongMeta:null,templates:[],cardio:[],strava:null,tplEdit:null,hfilter:'all',goal:lsGet('ll.goal',{lifts:2,cardio:2}),block:lsGet('ll.block',{name:'Fall 26',start:null,weeks:8,trips:[]}),cfg:{...CFG0,...lsGet('ll.cfg',{})},checkins:lsGet('ll.checkins',{}),undo:lsGet('ll.undo',null),swap:null,setup:{url:'',status:'',msg:''},insights:lsGet('ll.insights.v1',{}),detail:null,body:lsGet('ll.body',[]),bars:lsGet('ll.bars',{}),intDone:lsGet('ll.intdone',{}),howto:{},mode:'connecting',saveState:'',banner:''};
 const drafts=new Map();
 let store=null, pendingRender=false;
 let rest={until:0,len:lsGet('ll.rest',120),timer:null,doneAt:0};
@@ -370,7 +380,7 @@ function onRemote(entries){S.remote=new Map(entries);S.loaded=true;const cur=act
     if(id!==cur&&(r.updatedAt||'')>=(d.data.updatedAt||''))drafts.delete(id)}
   if(S.saveState==='')setSave('');renderSoon()}
 
-const APP_VERSION='2026-10-24.10';
+const APP_VERSION='2026-10-24.11';
 const K={w:'ll.workouts.v1',s:'ll.strong.v1',t:'ll.templates.v1',c:'ll.cardio.v1',sv:'ll.strava.v1',i:'ll.insights.v1'};
 function lsRead(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
 function lsWrite(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
@@ -487,6 +497,56 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 setInterval(()=>{if(document.visibilityState==='visible')syncNow(false)},5*60*1000);
 const ago=iso=>{const m=Math.round((Date.now()-Date.parse(iso))/60000);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':fmtShort(iso)};
 
+/* ---------- guided Google Sheets setup ---------- */
+const SCRIPT_URL_RE=/https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/;
+function findScriptUrl(t){t=String(t||'');try{const m=/#connect=([^\s]+)/.exec(t);if(m)t+=' '+decodeURIComponent(m[1])}catch(e){}const m2=SCRIPT_URL_RE.exec(t);return m2?m2[0]:null}
+const connectLink=u=>APP_HOME+'#connect='+encodeURIComponent(u);
+const standalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
+let qrLib=null;function loadQR(){if(window.QRCode)return Promise.resolve();if(qrLib)return qrLib;qrLib=new Promise((ok,bad)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';sc.onload=ok;sc.onerror=()=>{qrLib=null;bad(new Error('qr'))};document.head.appendChild(sc)});return qrLib}
+function drawQR(){const el=$('qr');if(!el||!S.setup.url)return;loadQR().then(()=>{el.innerHTML='';new QRCode(el,{text:connectLink(S.setup.url),width:220,height:220,correctLevel:QRCode.CorrectLevel.M})}).catch(()=>{el.innerHTML='<div class="muted" style="color:#333">Couldn\'t draw the code. Use the link below instead.</div>'})}
+function setupView(){const st=S.setup;const ok=st.status==='ok';
+  return `<div><button class="btn small ghost" data-act="tab" data-v="data">‹ Data</button></div>
+  <h1 style="font-size:28px;text-transform:uppercase">Set up Google Sheets</h1>
+  <div class="muted" style="font-size:15px">About 5 minutes. Do steps 1–3 on a computer (it's much easier than on a phone), then step 4 on your phone. You'll end up with your own private Google Sheet that your workouts sync to, which Claude can read if you connect Google Sheets in Claude.</div>
+  <div class="steps">
+  <section class="step"><h3>Make your copy of the sheet</h3>
+    ${TEMPLATE_COPY_URL&&!/__TEMPLATE_ID__/.test(TEMPLATE_COPY_URL)?`<div>Sign in to Google if asked, then click <kbd>Make a copy</kbd>. Google mentions it includes an Apps Script file: that's the small program that receives your workouts.</div>
+    <a class="btn primary block" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="${esc(TEMPLATE_COPY_URL)}">Make my Lift Log sheet</a>`
+    :`<ol><li>Create a blank Google Sheet at <b>sheets.new</b> and name it "Lift Log".</li><li>In it, click <kbd>Extensions</kbd> → <kbd>Apps Script</kbd>.</li><li>Delete the starter code, paste the sync script, and click the save icon.</li></ol>
+    <a class="btn block" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="https://github.com/rcdourron/lift-log/blob/main/Code.gs">Open the sync script</a>`}</section>
+  <section class="step"><h3>Turn on the sync</h3>
+    <ol><li>In your new sheet, click <kbd>Extensions</kbd> → <kbd>Apps Script</kbd>. A new tab opens.</li>
+    <li>Click the blue <kbd>Deploy</kbd> button (top right) → <kbd>New deployment</kbd>.</li>
+    <li>${TEMPLATE_COPY_URL&&!/__TEMPLATE_ID__/.test(TEMPLATE_COPY_URL)?'The settings are already filled in (Web app, Execute as "Me", Who has access "Anyone"). Just click <kbd>Deploy</kbd>.':'Click the gear next to "Select type" → <kbd>Web app</kbd>. Set <b>Execute as</b> to "Me" and <b>Who has access</b> to "Anyone", then click <kbd>Deploy</kbd>.'}</li>
+    <li>Click <kbd>Authorize access</kbd> and choose your Google account.</li>
+    <li>Google shows "Google hasn't verified this app". That's expected: it's your own copy, and only you can see it. Click <kbd>Advanced</kbd> → <kbd>Go to Lift Log sync (unsafe)</kbd> → <kbd>Allow</kbd>.</li>
+    <li>Next to <b>Web app URL</b>, click <kbd>Copy</kbd>, then <kbd>Done</kbd>.</li></ol>
+    <div class="muted">"Anyone" only means your phone can reach it without signing in. The first phone that connects gets a secret key, and the sheet ignores everyone else.</div></section>
+  <section class="step${ok?' done':''}"><h3>Paste the Web app URL here</h3>
+    <input class="search" id="setupUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(st.url||'')}">
+    <button class="btn primary block" data-act="setuptest" ${st.status==='testing'?'disabled':''}>${st.status==='testing'?'Checking…':'Check it'}</button>
+    ${st.msg?`<div class="${ok?'muted':'banner'}" style="font-size:14px">${esc(st.msg)}</div>`:''}</section>
+  <section class="step"><h3>Connect your phone</h3>
+    ${ok?`<ol><li>On your iPhone, install Lift Log if you haven't: open <b>${esc(APP_HOME.replace(/^https:\/\//,''))}</b> in Safari → <kbd>Share</kbd> → <kbd>Add to Home Screen</kbd>.</li>
+      <li>Point your phone's Camera at this code and tap the link that appears.</li>
+      <li>On the page that opens, tap <kbd>Copy connection</kbd>.</li>
+      <li>Open Lift Log from your home screen → <kbd>Data</kbd> → <kbd>Paste connection</kbd>.</li></ol>
+      <div class="qrbox"><div id="qr"></div></div>
+      <div class="muted">No camera handy? Send yourself this link and open it on the phone:</div>
+      <div class="row"><input class="search" readonly value="${esc(connectLink(st.url))}" style="flex:1"><button class="btn small" data-act="setupcopy">Copy</button></div>
+      ${standalone()?`<button class="btn primary block" data-act="setuphere">Connect this phone now</button>`:''}`
+    :`<div class="muted">Finish step 3 first. Then a code shows up here for your phone to scan.</div>`}</section>
+  </div>`}
+function connectSheetView(u,direct){return `<div class="muted" style="font-size:15px">This link connects Lift Log to a Google Sheet.</div>
+  ${direct||standalone()?`<button class="btn primary block" data-act="connectgo">Connect Lift Log to this sheet</button>`
+  :`<ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px"><li>Tap <kbd>Copy connection</kbd>.</li><li>Open Lift Log from your <b>home screen</b> (install it first if you haven't: <kbd>Share</kbd> → <kbd>Add to Home Screen</kbd>).</li><li>Go to <kbd>Data</kbd> → <kbd>Paste connection</kbd>.</li></ol>
+    <button class="btn primary block" data-act="connectcopy">Copy connection</button>
+    <button class="btn ghost block" data-act="connectgo">Use Lift Log in this browser instead</button>`}`}
+function readHash(){const h=location.hash||'';if(h.startsWith('#setup')){S.tab='setup';history.replaceState(null,'',location.pathname+location.search+'#setup');return}
+  const m=/^#connect=(.+)$/.exec(h);if(m){const u=findScriptUrl(decodeURIComponent(m[1]));history.replaceState(null,'',location.pathname+location.search);if(u){S.tab='data';S.sheet={type:'connect',url:u}}}}
+
+readHash();window.addEventListener('hashchange',()=>{readHash();render()});
+
 /* ---------- backup ---------- */
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 async function exportBackup(){flushAll();
@@ -518,14 +578,15 @@ function renderSoon(){const a=document.activeElement;if(a&&main.contains(a)&&(a.
 document.addEventListener('focusout',e=>{if(!pendingRender)return;const n=e.relatedTarget;if(n&&main.contains(n)&&(n.tagName==='INPUT'||n.tagName==='TEXTAREA'))return;setTimeout(()=>{if(pendingRender){pendingRender=false;render()}},0)});
 
 function render(){pendingRender=false;
-  ['workout','history','progress','data'].forEach(t=>$('tab-'+t).classList.toggle('on',S.tab===t));
+  ['workout','history','progress','data'].forEach(t=>$('tab-'+t).classList.toggle('on',S.tab===t||(t==='data'&&S.tab==='setup')));
   let h=S.banner?`<div class="banner">${esc(S.banner)}</div>`:'';
   if(!S.loaded)h+=`<div class="empty">Loading your workouts…</div>`;
   else if(S.tab==='workout'){const id=activeId();h+=S.tplEdit?tplEditor():id?editor(id):startScreen()}
-  else if(S.tab==='history')h+=history();
+  else if(S.tab==='history')h+=historyView();
   else if(S.tab==='progress')h+=progress();
+  else if(S.tab==='setup')h+=setupView();
   else h+=dataView();
-  main.innerHTML=h;renderTop(S.loaded&&S.tab==='workout'?(S.tplEdit?'tpl':activeId()):null);paintSave();renderSheet();updRest();tick()}
+  main.innerHTML=h;if(S.tab==='setup'&&S.setup.status==='ok')drawQR();renderTop(S.loaded&&S.tab==='workout'?(S.tplEdit?'tpl':activeId()):null);paintSave();renderSheet();updRest();tick()}
 
 const CLOCK='<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>';
 const ICAL='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
@@ -888,7 +949,7 @@ function hint(x,si,pv){const k=uk(x),s0=x.sets[si];if(s0&&(s0.tw!=null||s0.tr!=n
   for(let i=si-1;i>=0;i--){const s=x.sets[i];if(s.w!=null||s[k]!=null)return {w:s.w,r:s[k]};if(s.tw!=null||s.tr!=null)return {w:s.tw,r:s.tr}}
   const l=pv&&pv.sets[pv.sets.length-1];return l?{w:l.w,r:l[k]}:{w:null,r:null}}
 
-function history(){if(S.detail){const v=detailView();if(v)return v;S.detail=null}const fs=finished();const cs=S.cardio||[];
+function historyView(){if(S.detail){const v=detailView();if(v)return v;S.detail=null}const fs=finished();const cs=S.cardio||[];
   let h=`<h1 style="font-size:30px;text-transform:uppercase">History</h1>
   <div class="chips">${[['all','All'],['lifts','Lifts'],['cardio','Cardio']].map(([k,l])=>`<button class="chip${S.hfilter===k?' on':''}" data-act="hfilter" data-v="${k}">${l}</button>`).join('')}</div>
   <div class="muted" style="font-size:14px">${fs.length} workouts${S.strongMeta?` (${fs.filter(w=>w.source==='strong').length} from Strong)`:''} · ${cs.length} cardio sessions from Strava</div>`;
@@ -989,8 +1050,12 @@ function dataView(){const m=S.strongMeta;const mine=[...S.remote.values()].filte
   <div class="muted" style="font-size:14px">${m?'Imported '+esc(yd(m.importedAt))+'. ':''}In Strong, go to Settings → Export Strong Data, save the CSV to Files, then pick it here. A new import replaces your Strong history and never touches workouts you logged in Lift Log.</div>
   <label class="btn block" for="csvIn" style="text-align:center">Import Strong export (.csv)</label><input type="file" id="csvIn" class="vh" accept=".csv,text/csv,text/comma-separated-values"></section>`;
   h+=`<section class="panel"><div class="eyebrow">Google Sheets sync</div>`;
-  if(!SY.url)h+=`<div class="muted" style="font-size:14px">Sends every finished workout, your Strong history and your templates to a Google Sheet that Claude can read. Logging still works offline; it syncs when you're back online.</div>
-    <input class="search" id="sheetUrl" type="url" autocomplete="off" placeholder="Paste your Apps Script web app URL"><button class="btn primary" data-act="sheetconnect">Connect sheet</button>`;
+  if(!SY.url)h+=`<div class="muted" style="font-size:14px">Sends every finished workout, your Strong history and your templates to your own Google Sheet, which Claude can read. Logging still works offline; it syncs when you're back online.</div>
+    <div style="font-size:15px"><b>New to this?</b> Follow the guide; it's easiest on a computer. Open <b>${esc(APP_HOME.replace(/^https:\/\//,''))}#setup</b> there, or:</div>
+    <div class="row"><button class="btn info" style="flex:1" data-act="setupopen">Open the setup guide</button><button class="btn" data-act="setuplink">Copy guide link</button></div>
+    <div style="font-size:15px"><b>Have a connection link?</b></div>
+    <button class="btn primary block" data-act="pasteconn">Paste connection</button>
+    <details><summary class="muted" style="font-size:14px">Or paste the Web app URL by hand</summary><div class="row" style="margin-top:8px"><input class="search" id="sheetUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1"><button class="btn" data-act="sheetconnect">Connect</button></div></details>`;
   else{const st=syncing?'Syncing…':SY.err?'Not synced':SY.last?'Synced '+ago(SY.last):'Waiting to sync';const pc=pendingCount();
     h+=`<div class="hline"><span>Status</span><span>${esc(st)}</span></div><div class="hline"><span>Waiting to send</span><span>${pc?pc+' workout'+(pc>1?'s':''):'Nothing'}${SY.strong?' + Strong history':''}</span></div>
     ${SY.err?`<div class="banner">${esc(SY.err)}</div>`:''}
@@ -1110,6 +1175,7 @@ function sheetBody(){const sh=S.sheet;const id=activeId();const d=id?getW(id):nu
       ${sh.pl.warn.length?`<div class="muted" style="font-size:13px">Skipped: ${esc(sh.pl.warn.join('; '))}</div>`:''}
       <div class="muted" style="font-size:13px">Finished sets aren't touched. You can undo this afterwards.</div>
       <div class="row"><button class="btn" style="flex:1" data-act="livestep" data-v="paste">Back</button><button class="btn primary" style="flex:1" data-act="liveapply" ${sh.pl.desc.length?'':'disabled'}>Apply</button></div>`}
+  if(sh.type==='connect')return head('Connect your sheet')+(SY.url&&SY.url===sh.url?'<div class="muted">This phone is already connected to that sheet.</div>':SY.url?'<div class="banner">This phone is connected to a different sheet. Connecting replaces it.</div>'+connectSheetView(sh.url,sh.direct):connectSheetView(sh.url,sh.direct));
   if(sh.type==='plan'){const st=sh.step||'ask';
     if(st==='ask')return head('Plan with Claude')+`<div class="muted" style="font-size:14px">Tell Claude what you're training for. Lift Log copies a prompt with your current plan and opens Claude: paste it there, then copy Claude's whole reply and come back.</div>
       <div class="chips">${['New 8-week block starting next Monday','Ski trip coming up','Build up to a 10K','Only 2 days a week to train'].map(t=>`<button class="opt" data-act="planchip" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div>
@@ -1307,7 +1373,21 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
     case 'restsheet':S.sheet={type:'rest'};renderSheet();break;
     case 'restlen':rest.len=+b.dataset.v;lsSet('ll.rest',rest.len);renderSheet();render();break;
     case 'export':exportBackup();break;
-    case 'sheetconnect':{const u=$('sheetUrl');connectSheet(u&&u.value);break}
+    case 'sheetconnect':{const u=$('sheetUrl');connectSheet(findScriptUrl(u&&u.value)||(u&&u.value));break}
+    case 'setupopen':S.tab='setup';S.sheet=null;history.replaceState(null,'',location.pathname+'#setup');render();window.scrollTo(0,0);if(S.setup.status==='ok')setTimeout(drawQR,0);break;
+    case 'setuplink':{const t=APP_HOME+'#setup';try{navigator.clipboard.writeText(t).then(()=>flash('Link copied. Open it on a computer.'),()=>flash(t))}catch(e){flash(t)}break}
+    case 'setuptest':{const inp=$('setupUrl');const raw=inp?inp.value:'';const u=findScriptUrl(raw);S.setup.url=u||raw.trim();
+      if(!u){S.setup.status='bad';S.setup.msg='That doesn\'t look like a Web app URL. It should start with https://script.google.com/macros/s/ and end with /exec. Use the Copy button next to "Web app URL" in the deployment window.';render();break}
+      S.setup.status='testing';S.setup.msg='';render();
+      fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({op:'ping'}),redirect:'follow'}).then(r=>r.json()).then(j=>{
+        if(j&&(j.error==='no_token'||j.ok)){S.setup.status='ok';S.setup.msg='Your sheet is ready.'}else{S.setup.status='bad';S.setup.msg='The sheet answered, but not as expected ('+((j&&j.error)||'unknown')+'). Make sure you deployed the Lift Log copy.'}
+      }).catch(()=>{S.setup.status='bad';S.setup.msg='Couldn\'t reach it. In the deployment window, check "Who has access" is set to Anyone (not "Anyone with Google account"), then deploy again and paste the new URL.'}).finally(()=>{render();if(S.setup.status==='ok')setTimeout(drawQR,0)});break}
+    case 'setupcopy':{const t=connectLink(S.setup.url);try{navigator.clipboard.writeText(t).then(()=>flash('Link copied.'),()=>{})}catch(e){}break}
+    case 'setuphere':{const u=S.setup.url;S.tab='data';render();connectSheet(u);break}
+    case 'connectcopy':{const sh0=S.sheet;if(!sh0)break;try{navigator.clipboard.writeText(connectLink(sh0.url)).then(()=>flash('Copied. Now open Lift Log from your home screen → Data → Paste connection.'),()=>flash('Couldn\'t copy. Long-press the link and copy it instead.'))}catch(e){}break}
+    case 'connectgo':{const u=S.sheet&&S.sheet.url;S.sheet=null;S.tab='data';render();if(u)connectSheet(u);break}
+    case 'pasteconn':{const ask=()=>{flash('Couldn\'t read the clipboard. Use "paste the Web app URL by hand" below.');const d=document.querySelector('details');if(d)d.open=true};
+      try{navigator.clipboard.readText().then(t=>{const u=findScriptUrl(t);if(u){S.sheet={type:'connect',url:u,direct:true};renderSheet()}else flash('No sheet link on the clipboard. Copy the connection link first.')},ask)}catch(e){ask()}break}
     case 'syncnow':syncNow(true);break;
     case 'sheetdisc':{if(prevConfirm!=='sheetdisc'){S.confirm='sheetdisc';render();break}SY={url:'',token:'',pend:[],dels:[],strong:false,last:null,err:''};saveSY();render();flash('Disconnected. Your sheet keeps what was already synced.');break}
     case 'restoreno':S.restore=null;render();break;

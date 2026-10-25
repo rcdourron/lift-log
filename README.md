@@ -61,6 +61,19 @@ Keep personal plans out of a public repo; the Sheet is private to your Google ac
 
 `Code.gs` is a small Google Apps Script that receives workouts from the app and writes them to your sheet. It is **not** part of the website.
 
+### The easy way: the setup guide
+
+Open **[rcdourron.github.io/lift-log/#setup](https://rcdourron.github.io/lift-log/#setup)** on a computer (or tap **Data → Open the setup guide** in the app). It walks you through:
+
+1. **Make a copy** of a blank template sheet that already contains the script.
+2. In the copy: **Extensions → Apps Script → Deploy → New deployment → Deploy** (the settings are pre-filled), then approve Google's permission screens.
+3. Paste the Web app URL into the guide; it checks it and shows a QR code.
+4. Scan the code with your phone, tap **Copy connection**, then in Lift Log: **Data → Paste connection**.
+
+Later, the sheet's **Lift Log** menu → **Connect a phone…** shows the code again (for a new phone).
+
+### By hand
+
 1. Create a blank Google Sheet (e.g. "Lift Log").
 2. **Extensions → Apps Script.** Delete the starter code, paste all of `Code.gs`, **Save**.
 3. **Deploy → New deployment → ⚙ → Web app.** Execute as: **Me**. Who has access: **Anyone**. **Deploy**, then allow the permissions. Google warns the app is unverified because it's your own script: **Advanced → Go to (project) → Allow**.
@@ -70,6 +83,8 @@ Keep personal plans out of a public repo; the Sheet is private to your Google ac
 The first sync sends your Strong history, templates and every finished workout. After that each finished workout syncs within seconds when you're online, or queues until you are.
 
 "Anyone" only means the URL works without a Google sign-in. The first copy of Lift Log that connects registers a random secret with the script; requests without it are refused. To link a different phone or start over, delete the `TOKEN` entry under **Apps Script → Project Settings → Script Properties**.
+
+Forks: the template link is `TEMPLATE_COPY_URL` near the top of `index.html`. Point it at your own template (a blank sheet with `Code.gs` and an `appsscript.json` whose `webapp` section is `{"executeAs": "USER_DEPLOYING", "access": "ANYONE_ANONYMOUS"}`, shared view-only by link), or set it to `''` to show the by-hand steps. Also set `APP_URL` in `Code.gs` to your app's address.
 
 The sheet gets these tabs: **Workouts** (one row per session), **Sets** (one row per set), **Templates** (one row per template, with its full definition as JSON), **Cardio** (Strava, if connected), **Body** (body-weight log), **Plan** (your training block and cardio plan as setting/value rows that you or Claude can edit; the app picks up changes on its next sync) and **Insights** (Claude's notes on each activity: `id, kind, date, insight, created_at`; anything that can write to your sheet can fill it).
 

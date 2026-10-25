@@ -6,7 +6,7 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 
 1. **Bump the version on every change.** Edit `VERSION` at the top of `sw.js` and `APP_VERSION` near the top of the script in `index.html` (same value, format `YYYY-MM-DD.N`). Phones only pick up new code when `sw.js` changes byte-for-byte.
 2. **Keep it one file.** All app markup, CSS and JS live in `index.html`. Don't add a bundler or npm dependencies. The only external resource is Google Fonts, with system-font fallbacks.
-3. **Never commit personal data.** This repo is public. No real workouts, Strong exports, sheet URLs, Apps Script URLs or tokens. `seed.json` stays generic; personal templates belong in the user's Google Sheet.
+3. **Never commit personal data.** This repo is public. No real workouts, Strong exports, sheet URLs, Apps Script URLs or tokens. The one exception is `TEMPLATE_COPY_URL`: a deliberately public, blank template sheet. `seed.json` stays generic; personal templates belong in the user's Google Sheet.
 4. **Don't break stored data.** Users' workouts live in `localStorage` on their phones. If you change a data shape, read old shapes too, or migrate under a new key.
 5. **Add new cached files to `ASSETS` in `sw.js`.** A missing file there makes the app fail offline; a listed file that doesn't exist makes the service worker install fail.
 
@@ -171,6 +171,10 @@ LIFTLOG-PLAN
 ```
 
 `parsePlanBlock()` reads it, `mergePlan()` validates and clamps every field (anything left out keeps its current value), `planDesc()` renders the preview and `commitPlan()` saves it and marks it for sync. The same object shape is built from the sheet's Plan tab by `planFromRows()`.
+
+## Guided setup
+
+`#setup` (the app's address plus `#setup`) renders `setupView()`: copy the template (`TEMPLATE_COPY_URL`), deploy, paste the Web app URL, and the page checks it (a token-less `{op:"ping"}` POST must answer `no_token`, which proves it's reachable and is this script) and then draws a QR code (qrcodejs 1.0.0, loaded from cdnjs only on that page). The code encodes `<app>#connect=<encoded web app URL>`. Opening that link shows the `connect` sheet: in the installed app it connects directly; in a browser tab it offers **Copy connection**, because iOS home-screen apps don't share storage with Safari. **Data → Paste connection** reads the clipboard and accepts either the link or a bare Web app URL (`findScriptUrl()`). In the sheet, the `Lift Log` menu (`onOpen` in `Code.gs`) offers **Connect a phone…**, which draws the same QR code.
 
 ## Testing changes
 
