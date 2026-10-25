@@ -2,9 +2,11 @@
 /**
  * Lift Log → Google Sheets sync (and optional Strava cardio).
  *
- * Paste this whole file into Extensions → Apps Script in your "Lift Log" Google Sheet,
- * then Deploy → New deployment → Web app (Execute as: Me, Who has access: Anyone).
- * Paste the Web app URL into Lift Log → Data → Google Sheets sync.
+ * Easiest setup: open Lift Log's setup guide (the app's address + #setup) and follow it.
+ * By hand: paste this whole file into Extensions → Apps Script in a Google Sheet, then
+ * Deploy → New deployment → Web app (Execute as: Me, Who has access: Anyone), and paste the
+ * Web app URL into Lift Log → Data → Google Sheets sync. In the sheet, the Lift Log menu →
+ * "Connect a phone" shows a code your phone can scan.
  *
  * Security: the first copy of Lift Log that connects registers a random key with this
  * script. After that, requests without that key are refused, even from someone who has the URL.
@@ -41,8 +43,47 @@ const PLAN_NOTES = {
   lifts_per_week: 'Weekly lifting goal',
   cardio_per_week: 'Weekly cardio goal'
 };
+// Where the Lift Log app lives. Used for the phone-connection link and QR code.
+const APP_URL = 'https://rcdourron.github.io/lift-log/';
 const CARDIO_DAYS = 400;            // how far back the app receives cardio
 const STRAVA_MIN_GAP_MS = 5 * 60e3; // don't call Strava more often than this
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('Lift Log')
+    .addItem('Connect a phone…', 'showPhoneLink')
+    .addItem('Setup guide', 'showSetupGuide')
+    .addToUi();
+}
+
+function showSetupGuide() {
+  const html = '<div style="font:14px/1.5 Arial,sans-serif">'
+    + '<p>To sync this sheet with the Lift Log app:</p><ol>'
+    + '<li>Click <b>Extensions → Apps Script</b>.</li>'
+    + '<li>Click <b>Deploy → New deployment</b>, click the gear, choose <b>Web app</b>. Execute as: <b>Me</b>. Who has access: <b>Anyone</b>. Click <b>Deploy</b>.</li>'
+    + '<li>Click <b>Authorize access</b>. On "Google hasn\'t verified this app", click <b>Advanced → Go to … (unsafe) → Allow</b>. It\'s your own copy.</li>'
+    + '<li>Copy the <b>Web app URL</b>, then use <b>Lift Log → Connect a phone…</b> in this sheet.</li></ol>'
+    + '<p>Full guide with pictures of each step: <a target="_blank" href="' + APP_URL + '#setup">' + APP_URL + '#setup</a></p></div>';
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(440).setHeight(380), 'Lift Log setup');
+}
+
+function showPhoneLink() {
+  setup_(SpreadsheetApp.getActive());
+  let url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { url = ''; }
+  if (!/\/exec$/.test(url)) url = '';
+  const html = '<div style="font:14px/1.5 Arial,sans-serif">'
+    + '<p>Paste this sheet\'s <b>Web app URL</b> (Extensions → Apps Script → Deploy → Manage deployments → Copy), then scan the code with your phone\'s Camera.</p>'
+    + '<input id="u" style="width:100%;padding:8px;box-sizing:border-box" placeholder="https://script.google.com/macros/s/…/exec" value="' + url + '">'
+    + '<div id="qr" style="margin:14px auto;width:220px;height:220px"></div>'
+    + '<p style="word-break:break-all;font-size:12px" id="l"></p>'
+    + '<p style="font-size:12px;color:#555">On the phone: tap the link, then <b>Copy connection</b>, open Lift Log from your home screen → Data → <b>Paste connection</b>.</p></div>'
+    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>'
+    + '<script>var A=' + JSON.stringify(APP_URL) + ';function d(){var v=document.getElementById("u").value.trim();var q=document.getElementById("qr");q.innerHTML="";var l=document.getElementById("l");'
+    + 'if(!/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[A-Za-z0-9_-]+\\/exec$/.test(v)){l.textContent=v?"That isn\'t a Web app URL yet.":"";return}'
+    + 'var t=A+"#connect="+encodeURIComponent(v);l.textContent=t;new QRCode(q,{text:t,width:220,height:220})}'
+    + 'document.getElementById("u").addEventListener("input",d);window.onload=d;</script>';
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(380).setHeight(560), 'Connect a phone');
+}
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
