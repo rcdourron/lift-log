@@ -13,6 +13,7 @@ A free, offline-first lifting tracker you install on your phone's home screen. N
 - **Supersets.** Link exercises from the ••• menu; the rest timer starts only after the last exercise in the group.
 - **Strava cardio (optional).** Runs, rides and other activities show up in History and count toward a weekly goal shown on the start screen.
 - **Training blocks.** Set a block name, start date, length and ski trips (Data tab). The start screen shows "Week 3 of 8 · Build", the last week and the week before each trip are deloads (template sets are halved automatically), and it sets that week's cardio targets: an easy run that grows 5 minutes every two weeks (ticked off automatically from Strava) and interval rounds that grow by one.
+- **Plan with Claude.** Tap **Plan with Claude** on the Data tab, say what you're training for, and paste Claude's reply back: it sets the block (name, start, length, phases), ski trips, the easy-run and interval progressions and your weekly goal. With Sheets sync the plan also lives in a **Plan** tab, so Claude can read or change it there directly.
 - **Easy-pace check.** Runs faster than your easy pace are flagged.
 - **Next-day check-in.** The day after a session the app asks whether you feel better, the same or worse. "Worse" makes the next few days' suggested weights about 10% lighter.
 - **Finish summary**: duration, sets, volume against your last comparable session, and new PRs.
@@ -70,7 +71,7 @@ The first sync sends your Strong history, templates and every finished workout. 
 
 "Anyone" only means the URL works without a Google sign-in. The first copy of Lift Log that connects registers a random secret with the script; requests without it are refused. To link a different phone or start over, delete the `TOKEN` entry under **Apps Script → Project Settings → Script Properties**.
 
-The sheet gets these tabs: **Workouts** (one row per session), **Sets** (one row per set), **Templates** (one row per template, with its full definition as JSON), **Cardio** (Strava, if connected), **Body** (body-weight log) and **Insights** (Claude's notes on each activity: `id, kind, date, insight, created_at`; anything that can write to your sheet can fill it).
+The sheet gets these tabs: **Workouts** (one row per session), **Sets** (one row per set), **Templates** (one row per template, with its full definition as JSON), **Cardio** (Strava, if connected), **Body** (body-weight log), **Plan** (your training block and cardio plan as setting/value rows that you or Claude can edit; the app picks up changes on its next sync) and **Insights** (Claude's notes on each activity: `id, kind, date, insight, created_at`; anything that can write to your sheet can fill it).
 
 ### Strava cardio (optional, needs Sheets sync)
 

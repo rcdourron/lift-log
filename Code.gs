@@ -11,7 +11,7 @@
  * Strava credentials (if you connect Strava) are kept in this script's properties, never in the app.
  */
 
-const TABS = { workouts: 'Workouts', sets: 'Sets', templates: 'Templates', cardio: 'Cardio', body: 'Body', insights: 'Insights' };
+const TABS = { workouts: 'Workouts', sets: 'Sets', templates: 'Templates', cardio: 'Cardio', body: 'Body', insights: 'Insights', plan: 'Plan' };
 const WORKOUT_HEADER = ['id', 'date', 'name', 'source', 'template', 'minutes', 'sets', 'volume_lb', 'notes', 'updated_at', 'json'];
 const SET_HEADER = ['workout_id', 'date', 'workout', 'exercise', 'set', 'type', 'weight_lb', 'reps', 'seconds', 'distance', 'rpe', 'note', 'source'];
 const TEMPLATE_HEADER = ['id', 'order', 'name', 'summary', 'json'];
@@ -19,6 +19,28 @@ const CARDIO_HEADER = ['id', 'date', 'type', 'name', 'minutes', 'distance_mi', '
 const BODY_HEADER = ['date', 'weight_lb'];
 // Insights are written by Claude (for example a scheduled task with the Google Sheets connector), one row per activity.
 const INSIGHT_HEADER = ['id', 'kind', 'date', 'insight', 'created_at'];
+// Training plan as setting/value rows. The app writes it when you change the plan; Claude (or you) can edit the value column.
+const PLAN_HEADER = ['setting', 'value', 'notes'];
+const PLAN_NOTES = {
+  block_name: 'Name of the training block',
+  block_start: 'First day of week 1, YYYY-MM-DD (a Monday). Blank = not started',
+  block_weeks: 'Length of the block in weeks',
+  ski_trips: 'Trip start dates, YYYY-MM-DD, comma separated. The week before each is a deload',
+  phases: 'JSON: [{"weeks":"1-2","name":"Rebuild","note":"..."},{"weeks":"8","name":"Deload","deload":true}]. Blank = default',
+  easy_pace: 'Easy runs should be slower than this, min:sec per mile',
+  easy_run_start_min: 'Easy run minutes in week 1',
+  easy_run_step_min: 'Minutes added each step',
+  easy_run_every_weeks: 'Weeks between steps',
+  easy_run_max_min: 'Easy run cap, minutes',
+  intervals_start_rounds: 'Interval rounds in week 1 (0 = no intervals)',
+  intervals_step_rounds: 'Rounds added each step',
+  intervals_every_weeks: 'Weeks between steps',
+  intervals_max_rounds: 'Interval rounds cap',
+  interval_work_sec: 'Hard part of each round, seconds',
+  interval_rest_sec: 'Easy part of each round, seconds',
+  lifts_per_week: 'Weekly lifting goal',
+  cardio_per_week: 'Weekly cardio goal'
+};
 const CARDIO_DAYS = 400;            // how far back the app receives cardio
 const STRAVA_MIN_GAP_MS = 5 * 60e3; // don't call Strava more often than this
 
@@ -91,6 +113,8 @@ function handle_(req) {
         rewrite_(sh.body, BODY_HEADER.length, () => false, rows, 0);
       }
 
+      if (Array.isArray(req.plan)) writePlan_(sh.plan, req.plan);
+
       let cardio = null;
       if (req.cardio !== false && props.getProperty('STRAVA_REFRESH')) {
         try { fetchStrava_(sh.cardio, !!req.forceCardio); props.deleteProperty('STRAVA_ERROR'); }
@@ -98,7 +122,7 @@ function handle_(req) {
       }
       if (req.cardio !== false) cardio = readCardio_(sh.cardio);
 
-      return { ok: true, wrote: all.length, templates: readTemplates_(sh.templates), cardio: cardio, insights: readInsights_(sh.insights), strava: stravaStatus_() };
+      return { ok: true, wrote: all.length, templates: readTemplates_(sh.templates), cardio: cardio, insights: readInsights_(sh.insights), plan: readPlan_(sh.plan), strava: stravaStatus_() };
     }
     return { ok: false, error: 'unknown_op' };
   } catch (err) {
@@ -125,7 +149,8 @@ function setup_(ss) {
     templates: get(TABS.templates, TEMPLATE_HEADER, [1, 5]),
     cardio: get(TABS.cardio, CARDIO_HEADER, [1, 2]),
     body: get(TABS.body, BODY_HEADER, [1]),
-    insights: get(TABS.insights, INSIGHT_HEADER, [1])
+    insights: get(TABS.insights, INSIGHT_HEADER, [1]),
+    plan: get(TABS.plan, PLAN_HEADER, [1, 2])
   };
   const blank = ss.getSheetByName('Sheet1');
   if (blank && ss.getSheets().length > 1 && blank.getLastRow() === 0) ss.deleteSheet(blank);
@@ -299,6 +324,32 @@ function fetchStrava_(sheet, force) {
   rows.forEach(r => fresh[r[0]] = true);
   rewrite_(sheet, CARDIO_HEADER.length, r => r[0] !== '' && !fresh[String(r[0])], rows, 1);
   p.setProperty('STRAVA_LAST', String(Date.now()));
+}
+
+function writePlan_(sheet, rows) {
+  const clean = rows.filter(r => Array.isArray(r) && r[0]).slice(0, 60)
+    .map(r => [String(r[0]).slice(0, 60), String(r[1] == null ? '' : r[1]).slice(0, 5000), PLAN_NOTES[r[0]] || '']);
+  const last = sheet.getLastRow();
+  if (last > 1) sheet.getRange(2, 1, last - 1, PLAN_HEADER.length).clearContent();
+  sheet.getRange(1, 2, sheet.getMaxRows(), 1).setNumberFormat('@');
+  if (clean.length) sheet.getRange(2, 1, clean.length, PLAN_HEADER.length).setValues(clean);
+}
+
+function readPlan_(sheet) {
+  const last = sheet.getLastRow();
+  if (last < 2) return { rows: [], rev: '' };
+  const tz = Session.getScriptTimeZone();
+  const rows = sheet.getRange(2, 1, last - 1, 2).getValues()
+    .filter(r => String(r[0]).trim())
+    .map(r => {
+      let v = r[1];
+      if (v instanceof Date) v = v.getFullYear() < 1901 ? Utilities.formatDate(v, tz, 'H:mm') : Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+      return [String(r[0]).trim(), String(v == null ? '' : v).trim()];
+    });
+  const json = JSON.stringify(rows);
+  let h = 0;
+  for (let i = 0; i < json.length; i++) h = (h * 31 + json.charCodeAt(i)) | 0;
+  return { rows: rows, rev: String(h >>> 0) };
 }
 
 function readInsights_(sheet) {

@@ -31,8 +31,8 @@ Lift Log is a static, offline-first PWA. There is no build step, package manager
 | `ll.strava.v1` | Last Strava status from the script: `{connected, hasApp, last, error}`. |
 | `ll.goal` | Weekly goal `{lifts, cardio}`. |
 | `ll.exnotes.v1` | Pinned per-exercise notes `{ [exerciseName]: text }`. |
-| `ll.block` | Training block `{name, start: 'YYYY-MM-DD'|null, weeks, trips: ['YYYY-MM-DD']}`. Deload = last week, or any week with a trip in the next 7 days. |
-| `ll.cfg` | `{sound, easyPace: 'M:SS', runBase, runMax, intBase, intMax, claudeUrl}`. |
+| `ll.block` | Training block `{name, start: 'YYYY-MM-DD'|null, weeks, trips: ['YYYY-MM-DD'], phases?: [{from, to, name, note, deload?}]}`. Without `phases` the defaults are weeks 1–2 Rebuild, 3…n-1 Build, last week Deload (`phasesOf()`). A week with a trip in the next 7 days is also a deload. |
+| `ll.cfg` | `{sound, easyPace: 'M:SS', runBase, runStep, runEvery, runMax, intBase, intStep, intEvery, intMax, intWork, intRest, claudeUrl}`, merged over `CFG0` defaults. Easy-run minutes = `runBase + runStep × floor((week-1)/runEvery)`, capped at `runMax`; interval rounds likewise. |
 | `ll.checkins` | `{ [workoutId]: {v: 'better'|'same'|'worse', at} }`. A "worse" in the last 72 h makes `suggestFor()` return ~90% of last top weight. |
 | `ll.body` | Body-weight log `[{date: 'YYYY-MM-DD', lb}]`, sorted. |
 | `ll.bars` | Per-exercise bar weight for plate math `{ [exerciseName]: lb | 0 (plates only) | null (none) }`. Defaults in `barFor()`. |
@@ -130,6 +130,7 @@ Script Properties used: `TOKEN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `ST
 - **Templates:** `id, order, name, summary, json`. Edit the `json` cell to change a template; it reaches the phone on its next sync (unless the phone has unsynced template edits, which win).
 - **Cardio:** `id, date, type, name, minutes, distance_mi, elevation_ft, avg_hr, effort, elapsed_min` — one row per Strava activity except WeightTraining, upserted by id.
 - **Body:** `date, weight_lb` — the app's body-weight log, replaced wholesale on each change.
+- **Plan:** `setting, value, notes` rows (`PLAN_ROWS` in the app lists the keys: `block_name`, `block_start`, `block_weeks`, `ski_trips`, `phases` (JSON or blank), `easy_pace`, `easy_run_start_min`, `easy_run_step_min`, `easy_run_every_weeks`, `easy_run_max_min`, `intervals_start_rounds`, `intervals_step_rounds`, `intervals_every_weeks`, `intervals_max_rounds`, `interval_work_sec`, `interval_rest_sec`, `lifts_per_week`, `cardio_per_week`). The app sends `plan: [[key, value], …]` after any plan change and the script rewrites the tab; every sync response carries `plan: {rows, rev}` (`rev` is a hash of the rows), and when `rev` differs from the last one the app saw and it has no unsent changes, the app applies the sheet's plan. So anyone can edit the value column and the phone follows. An empty tab makes the app push its current plan.
 - **Insights:** `id, kind, date, insight, created_at` — written by Claude or any other tool, never by the app. `id` matches a Workouts `id` (Lift Log or `strong-…`) or a Cardio `id` (Strava activity id); `kind` is `lift` or `cardio`. The sync response includes them as `insights: { [id]: {text, at} }` and the app shows them on that activity's detail page.
 
 `date` is local time `YYYY-MM-DD HH:MM`. `source` is `lift-log` or `strong`. Rows are kept sorted by date.
@@ -156,6 +157,20 @@ LIFTLOG-CHANGES
 ```
 
 `ex`/`after` are 1-based numbers from the prompt, resolved before anything moves. Done sets are never changed; swapping an exercise with done sets keeps it (done sets only) and inserts the new one after it. New sets become targets (`tw`/`tr`), so the user still confirms each one. Changed exercises get `adj: 1`, which turns off smart-progression suggestions for them. The menu's **Swap exercise** uses the same code (`op: swap` without `sets`: reps carry over, weights clear). `altsFor()` lists similar movements using the `ALT` pattern groups.
+
+## Plan blocks (Plan with Claude)
+
+The Data tab's **Plan with Claude** copies `planPrompt()` (the current plan as JSON) and opens Claude. Claude replies with:
+
+```
+LIFTLOG-PLAN
+{"block":{"name":"Winter 27","start":"2026-11-02","weeks":8,"trips":["2027-01-15"],
+  "phases":[{"weeks":"1-2","name":"Rebuild","note":"…"},{"weeks":"3-7","name":"Build","note":"…"},{"weeks":"8","name":"Deload","deload":true}]},
+ "cardio":{"easyPace":"10:20","easyRun":{"start":35,"step":5,"every":2,"max":50},"intervals":{"start":6,"step":1,"every":2,"max":10,"work":60,"rest":60}},
+ "goal":{"lifts":2,"cardio":2}}
+```
+
+`parsePlanBlock()` reads it, `mergePlan()` validates and clamps every field (anything left out keeps its current value), `planDesc()` renders the preview and `commitPlan()` saves it and marks it for sync. The same object shape is built from the sheet's Plan tab by `planFromRows()`.
 
 ## Testing changes
 
